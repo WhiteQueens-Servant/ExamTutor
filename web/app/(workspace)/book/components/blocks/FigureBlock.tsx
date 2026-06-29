@@ -59,10 +59,18 @@ export default function FigureBlock({ block }: FigureBlockProps) {
 
   const renderType = coerceRenderType(block.payload?.render_type, language);
 
+  /** Sanitize Mermaid: collapse newlines inside node labels [...]. */
+  const sanitizedContent =
+    renderType === "mermaid" && content.includes("\n")
+      ? content.replace(/\[([^\]]*)\]/g, (_m, inner: string) =>
+          inner.includes("\n") ? `[${inner.replace(/\n/g, " ")}]` : _m,
+        )
+      : content;
+
   const result: VisualizeResult = {
     response: description,
     render_type: renderType,
-    code: { language, content },
+    code: { language, content: sanitizedContent },
     analysis: {
       render_type: renderType,
       description,

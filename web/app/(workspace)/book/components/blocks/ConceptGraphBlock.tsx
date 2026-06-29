@@ -68,12 +68,21 @@ export default function ConceptGraphBlock({
   const graph = asGraph(block.payload?.graph);
   const index = asIndex(block.payload?.index);
 
+  /** Sanitize Mermaid source: collapse newlines inside node labels [...]. */
+  const sanitizedMermaid = useMemo(() => {
+    if (!mermaidSrc) return mermaidSrc;
+    // Replace literal \n inside node labels (e.g. [...\n...]) with space
+    return mermaidSrc.replace(/\[([^\]]*)\]/g, (_m, inner: string) =>
+      inner.includes("\n") ? `[${inner.replace(/\n/g, " ")}]` : _m,
+    );
+  }, [mermaidSrc]);
+
   const fenced = useMemo(
     () =>
-      mermaidSrc
-        ? `\`\`\`mermaid\n${mermaidSrc}\n\`\`\``
+      sanitizedMermaid
+        ? `\`\`\`mermaid\n${sanitizedMermaid}\n\`\`\``
         : '```mermaid\ngraph TD\n  empty["(no concepts yet)"]\n```',
-    [mermaidSrc],
+    [sanitizedMermaid],
   );
 
   const chapterNodes = graph?.nodes.filter((n) => n.chapter_id) ?? [];
@@ -134,7 +143,7 @@ export default function ConceptGraphBlock({
               return (
                 <li key={chapter.id}>
                   <Link
-                    href={`/book/${bookId}?page=${chapter.page_id}`}
+                    href={`/book?book=${encodeURIComponent(bookId)}&page=${chapter.page_id}`}
                     className="block rounded-md px-2 py-1.5 hover:bg-[var(--background)]"
                   >
                     {label}

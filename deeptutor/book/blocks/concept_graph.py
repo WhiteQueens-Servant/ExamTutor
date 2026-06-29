@@ -30,9 +30,10 @@ def _safe_id(node_id: str, used: set[str]) -> str:
 
 
 def _escape_label(text: str, *, max_len: int = 48) -> str:
-    """Mermaid-safe label: collapse whitespace and escape quotes."""
-    cleaned = " ".join((text or "").split())
+    """Mermaid-safe label: collapse whitespace, strip newlines, escape quotes."""
+    cleaned = " ".join((text or "").split())  # split() handles \n, \t, etc.
     cleaned = cleaned.replace('"', "'")
+    cleaned = cleaned.replace("\n", " ")  # extra safety: strip any lingering newlines
     if len(cleaned) > max_len:
         cleaned = cleaned[: max_len - 1] + "…"
     return cleaned or "concept"

@@ -21,12 +21,23 @@ function stripCodeFence(source: string): string {
   return fenced ? fenced[1].trim() : trimmed;
 }
 
+/** Strip JS-style comments (// and /* … *​/) from JSON-like strings. */
+function stripJsonComments(s: string): string {
+  // Remove single-line comments (// ...) but NOT inside strings.
+  // Simple approach: strip // … at line level — safe for Chart.js configs
+  // which never embed literal "//" inside string values.
+  let out = s.replace(/\/\/[^\n]*/g, "");
+  // Remove multi-line comments
+  out = out.replace(/\/\*[\s\S]*?\*\//g, "");
+  return out;
+}
+
 function parseChartConfig(source: string): unknown {
   const raw = stripCodeFence(source);
   try {
-    return JSON.parse(raw);
+    return JSON.parse(stripJsonComments(raw));
   } catch {
-    const jsonish = raw
+    const jsonish = stripJsonComments(raw)
       .replace(/([{,]\s*)([A-Za-z_$][\w$]*)\s*:/g, '$1"$2":')
       .replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, (_match, value: string) =>
         JSON.stringify(value.replace(/\\'/g, "'")),

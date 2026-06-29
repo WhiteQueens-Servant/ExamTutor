@@ -111,11 +111,19 @@ export const Mermaid: React.FC<MermaidProps> = ({ chart, className = "" }) => {
     const renderChart = async () => {
       if (!chart.trim() || !containerRef.current) return;
 
+      // Sanitize: collapse newlines inside node labels [...]
+      // to prevent Mermaid parse errors from LLM-generated diagrams.
+      const sanitized = chart
+        .trim()
+        .replace(/\[([^\]]*)\]/g, (_m, inner: string) =>
+          inner.includes("\n") ? `[${inner.replace(/\n/g, " ")}]` : _m,
+        );
+
       try {
         const mermaid = await loadMermaid();
         applyMermaidTheme(mermaid);
         cleanupMermaidOrphans(id);
-        const { svg: renderedSvg } = await mermaid.render(id, chart.trim());
+        const { svg: renderedSvg } = await mermaid.render(id, sanitized);
         if (!cancelled) {
           setSvg(renderedSvg);
           setError(null);
