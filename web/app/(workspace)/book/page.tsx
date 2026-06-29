@@ -208,34 +208,6 @@ function BookPageInner() {
     [loadBookDetail],
   );
 
-  // Allow deep-linking via /book?book=<id>&page=<pageId> (e.g. from ConceptGraphBlock).
-  const searchParams = useSearchParams();
-  const requestedBookId = searchParams?.get("book") || null;
-  const requestedPageId = searchParams?.get("page") || null;
-  useEffect(() => {
-    if (!requestedBookId) return;
-    if (requestedBookId === selectedBookId) {
-      // Book already selected — just navigate to the requested page if different.
-      if (requestedPageId && requestedPageId !== selectedPageId) {
-        setSelectedPageId(requestedPageId);
-        if (detail) {
-          const page = detail.pages.find((p) => p.id === requestedPageId);
-          if (page && page.status !== "ready" && page.status !== "generating") {
-            void compilePage(requestedPageId);
-          }
-        }
-      }
-      return;
-    }
-    if (requestedBookId === lastDeepLinkedBookId.current) return;
-    lastDeepLinkedBookId.current = requestedBookId;
-    void handleSelectBook(requestedBookId).then(() => {
-      // After book loads, select the requested page if provided.
-      if (requestedPageId) {
-        setSelectedPageId(requestedPageId);
-      }
-    });
-  }, [requestedBookId, requestedPageId, selectedBookId, selectedPageId, handleSelectBook, detail, compilePage]);
 
   const handleDeleteBook = async (id: string) => {
     if (!confirm(t("Delete this book? This cannot be undone."))) return;
@@ -339,6 +311,36 @@ function BookPageInner() {
     },
     [selectedBookId, loadBookDetail],
   );
+
+  // Allow deep-linking via /book?book=<id>&page=<pageId> (e.g. from ConceptGraphBlock).
+  // Placed after compilePage definition to avoid temporal dead zone.
+  const searchParams = useSearchParams();
+  const requestedBookId = searchParams?.get("book") || null;
+  const requestedPageId = searchParams?.get("page") || null;
+  useEffect(() => {
+    if (!requestedBookId) return;
+    if (requestedBookId === selectedBookId) {
+      // Book already selected — just navigate to the requested page if different.
+      if (requestedPageId && requestedPageId !== selectedPageId) {
+        setSelectedPageId(requestedPageId);
+        if (detail) {
+          const page = detail.pages.find((p) => p.id === requestedPageId);
+          if (page && page.status !== "ready" && page.status !== "generating") {
+            void compilePage(requestedPageId);
+          }
+        }
+      }
+      return;
+    }
+    if (requestedBookId === lastDeepLinkedBookId.current) return;
+    lastDeepLinkedBookId.current = requestedBookId;
+    void handleSelectBook(requestedBookId).then(() => {
+      // After book loads, select the requested page if provided.
+      if (requestedPageId) {
+        setSelectedPageId(requestedPageId);
+      }
+    });
+  }, [requestedBookId, requestedPageId, selectedBookId, selectedPageId, handleSelectBook, detail, compilePage]);
 
   const handleSelectPage = (pageId: string) => {
     setSelectedPageId(pageId);
