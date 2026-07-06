@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>方案 A: Exam Sprint 作为 Chat Capability</title>
+<style>
+  :root {
+    --bg: #0a0a0a; --card: #141414; --border: #262626; --fg: #e5e5e5;
+    --muted: #737373; --primary: #3b82f6; --primary-fg: #fff;
+    --sidebar-bg: #111; --sidebar-hover: #1a1a1a; --sidebar-active: #1e1e1e;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:var(--bg); color:var(--fg); display:flex; height:100vh; overflow:hidden; }
+
+  /* Sidebar */
+  .sidebar { width:220px; background:var(--sidebar-bg); display:flex; flex-direction:column; border-right:1px solid var(--border); flex-shrink:0; }
+  .sidebar-header { padding:16px; display:flex; align-items:center; gap:8px; height:56px; }
+  .sidebar-header img { width:22px; height:22px; border-radius:4px; }
+  .sidebar-header span { font-size:14px; font-weight:600; }
+  .nav { padding:4px 8px; }
+  .nav-item { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:8px; font-size:13.5px; color:var(--muted); text-decoration:none; transition:all .15s; }
+  .nav-item:hover { background:var(--sidebar-hover); color:var(--fg); }
+  .nav-item.active { background:var(--sidebar-active); color:var(--fg); font-weight:500; }
+  .nav-item .icon { width:16px; height:16px; opacity:.7; }
+  .nav-item.active .icon { opacity:1; }
+  .nav-divider { height:1px; background:var(--border); margin:8px 12px; opacity:.4; }
+
+  /* Main area */
+  .main { flex:1; display:flex; flex-direction:column; }
+
+  /* Top bar with capability selector */
+  .topbar { display:flex; align-items:center; gap:8px; padding:8px 16px; border-bottom:1px solid var(--border); height:48px; background:var(--card); }
+  .cap-btn { padding:5px 12px; border-radius:6px; font-size:12px; border:1px solid var(--border); background:transparent; color:var(--muted); cursor:pointer; transition:all .15s; }
+  .cap-btn:hover { border-color:var(--primary); color:var(--fg); }
+  .cap-btn.active { background:var(--primary); color:var(--primary-fg); border-color:var(--primary); }
+  .cap-btn.exam { background:#7c3aed; border-color:#7c3aed; color:#fff; }
+
+  /* Chat area */
+  .chat-area { flex:1; display:flex; flex-direction:column; }
+
+  /* Activity panel (right side) */
+  .activity-panel { width:300px; border-left:1px solid var(--border); background:var(--card); padding:16px; overflow-y:auto; flex-shrink:0; }
+  .activity-panel h3 { font-size:11px; text-transform:uppercase; letter-spacing:.14em; color:var(--primary); font-weight:600; margin-bottom:12px; }
+  .config-section { margin-bottom:16px; }
+  .config-section label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+  .config-section input, .config-section textarea { width:100%; padding:8px 12px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--fg); font-size:13px; }
+  .config-section textarea { min-height:60px; resize:vertical; }
+  .confirm-btn { width:100%; padding:8px; border-radius:8px; background:var(--primary); color:#fff; border:none; font-size:13px; font-weight:600; cursor:pointer; margin-top:8px; }
+
+  /* Chat messages */
+  .messages { flex:1; padding:20px 24px; overflow-y:auto; display:flex; flex-direction:column; gap:16px; }
+  .msg { max-width:600px; padding:12px 16px; border-radius:12px; font-size:14px; line-height:1.6; }
+  .msg.user { align-self:flex-end; background:var(--primary); color:#fff; }
+  .msg.assistant { align-self:flex-start; background:var(--card); border:1px solid var(--border); }
+  .msg .system-tag { font-size:10px; color:var(--muted); margin-bottom:4px; }
+
+  /* Composer */
+  .composer { padding:12px 16px; border-top:1px solid var(--border); display:flex; gap:8px; background:var(--card); }
+  .composer input { flex:1; padding:10px 14px; border-radius:10px; border:1px solid var(--border); background:var(--bg); color:var(--fg); font-size:14px; }
+  .composer button { padding:10px 20px; border-radius:10px; background:var(--primary); color:#fff; border:none; font-weight:600; cursor:pointer; }
+
+  /* Label */
+  .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:600; }
+  .badge-purple { background:#7c3aed22; color:#a78bfa; border:1px solid #7c3aed44; }
+
+  .content-row { display:flex; flex:1; min-height:0; }
+
+  .annotation { position:absolute; background:#f59e0b; color:#000; font-size:10px; font-weight:700; padding:3px 8px; border-radius:4px; white-space:nowrap; z-index:10; }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div style="width:22px;height:22px;background:#3b82f6;border-radius:4px;"></div>
+    <span>DeepTutor</span>
+  </div>
+  <nav class="nav">
+    <a class="nav-item active" href="#">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Chat
+    </a>
+    <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>TutorBot</a>
+    <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>Co-Writer</a>
+    <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Book</a>
+    <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>Knowledge</a>
+    <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Space</a>
+    <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><circle cx="12" cy="12" r="10"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Memory</a>
+    <div class="nav-divider"></div>
+    <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</a>
+  </nav>
+</aside>
+
+<!-- Main content -->
+<div class="main">
+  <!-- Capability selector bar -->
+  <div class="topbar" style="position:relative;">
+    <button class="cap-btn">Chat</button>
+    <button class="cap-btn">Solve</button>
+    <button class="cap-btn">Quiz</button>
+    <button class="cap-btn">Research</button>
+    <button class="cap-btn">Visualize</button>
+    <button class="cap-btn exam active">
+      <svg style="width:12px;height:12px;margin-right:4px;vertical-align:-1px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Exam Sprint
+    </button>
+    <span class="badge badge-purple" style="margin-left:auto;">Capability 模式</span>
+  </div>
+
+  <div class="content-row">
+    <!-- Chat messages -->
+    <div class="chat-area">
+      <div class="messages">
+        <div class="msg assistant">
+          <div class="system-tag">📋 Exam Sprint · 冷启动阶段</div>
+          <p>已为你生成诊断评估。以下是基于课程材料的 15 道诊断题（每个知识点 3 题），用于评估你当前的掌握程度。</p>
+          <p style="margin-top:8px;">请开始作答，完成后我会为你生成个性化冲刺计划。</p>
+        </div>
+        <div class="msg user">开始诊断</div>
+        <div class="msg assistant">
+          <div class="system-tag">📝 诊断题目 1/15</div>
+          <p><strong>知识点：傅里叶变换</strong></p>
+          <p>以下哪个说法正确描述了傅里叶变换的性质？</p>
+          <p style="margin-top:6px;">A. 傅里叶变换只能用于周期信号<br>B. 傅里叶变换将时域信号转换为频域表示<br>C. 傅里叶变换的结果总是实数<br>D. 傅里叶变换不满足线性性质</p>
+        </div>
+        <div class="msg user">B</div>
+        <div class="msg assistant">
+          <div class="system-tag">✅ 正确</div>
+          <p>傅里叶变换的核心就是将时域信号转换为频域表示。继续下一题...</p>
+        </div>
+      </div>
+
+      <!-- Composer -->
+      <div class="composer">
+        <input type="text" placeholder="输入你的答案或指令..." />
+        <button>发送</button>
+      </div>
+    </div>
+
+    <!-- Activity panel (right side config) -->
+    <div class="activity-panel">
+      <h3>
+        <svg style="width:13px;height:13px;margin-right:4px;vertical-align:-2px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Exam Sprint 设置
+      </h3>
+
+      <div class="config-section">
+        <label>考试名称</label>
+        <input type="text" value="数字电子技术 期末考试" />
+      </div>
+      <div class="config-section">
+        <label>考试日期</label>
+        <input type="text" value="2026-07-15" />
+      </div>
+      <div class="config-section">
+        <label>知识点（每行一个）</label>
+        <textarea>傅里叶变换
+拉普拉斯变换
+Z 变换
+数字滤波器
+采样定理</textarea>
+      </div>
+      <div class="config-section">
+        <label>关联知识库</label>
+        <input type="text" value="数字电子技术-课件" />
+      </div>
+      <button class="confirm-btn">✓ 已确认</button>
+
+      <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border);">
+        <h3 style="margin-bottom:8px;">冲刺进度</h3>
+        <div style="font-size:12px; color:var(--muted); margin-bottom:8px;">
+          Phase 1 · 剩余 12 天
+        </div>
+        <div style="background:var(--bg); border-radius:6px; height:6px; overflow:hidden; margin-bottom:12px;">
+          <div style="background:var(--primary); width:15%; height:100%; border-radius:6px;"></div>
+        </div>
+        <div style="font-size:11px; color:var(--muted);">
+          已完成 2/15 诊断题<br>
+          已识别 5 个知识点
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

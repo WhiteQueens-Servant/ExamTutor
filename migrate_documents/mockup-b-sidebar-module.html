@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>方案 B: Exam Sprint 作为侧边栏独立模块</title>
+<style>
+  :root {
+    --bg: #0a0a0a; --card: #141414; --border: #262626; --fg: #e5e5e5;
+    --muted: #737373; --primary: #3b82f6; --primary-fg: #fff;
+    --sidebar-bg: #111; --sidebar-hover: #1a1a1a; --sidebar-active: #1e1e1e;
+    --purple: #7c3aed; --green: #22c55e; --amber: #f59e0b; --red: #ef4444;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:var(--bg); color:var(--fg); display:flex; height:100vh; overflow:hidden; }
+
+  /* Sidebar */
+  .sidebar { width:220px; background:var(--sidebar-bg); display:flex; flex-direction:column; border-right:1px solid var(--border); flex-shrink:0; }
+  .sidebar-header { padding:16px; display:flex; align-items:center; gap:8px; height:56px; }
+  .sidebar-header .logo { width:22px; height:22px; background:#3b82f6; border-radius:4px; }
+  .sidebar-header span { font-size:14px; font-weight:600; }
+  .nav { padding:4px 8px; }
+  .nav-item { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:8px; font-size:13.5px; color:var(--muted); text-decoration:none; transition:all .15s; }
+  .nav-item:hover { background:var(--sidebar-hover); color:var(--fg); }
+  .nav-item.active { background:var(--sidebar-active); color:var(--fg); font-weight:500; }
+  .nav-item .icon { width:16px; height:16px; opacity:.7; }
+  .nav-item.active .icon { opacity:1; }
+  .nav-divider { height:1px; background:var(--border); margin:8px 12px; opacity:.4; }
+
+  /* Main area */
+  .main { flex:1; display:flex; flex-direction:column; }
+
+  /* Page header */
+  .page-header { padding:20px 28px 0; border-bottom:1px solid var(--border); background:var(--card); }
+  .page-header h1 { font-size:20px; font-weight:600; margin-bottom:4px; display:flex; align-items:center; gap:8px; }
+  .page-header p { font-size:13px; color:var(--muted); margin-bottom:16px; }
+  .page-tabs { display:flex; gap:0; }
+  .page-tab { padding:10px 16px; font-size:13px; color:var(--muted); border-bottom:2px solid transparent; cursor:pointer; transition:all .15s; }
+  .page-tab:hover { color:var(--fg); }
+  .page-tab.active { color:var(--fg); border-bottom-color:var(--primary); font-weight:500; }
+
+  /* Content area */
+  .content { flex:1; display:flex; min-height:0; }
+
+  /* Left panel: exam list / dashboard */
+  .left-panel { width:320px; border-right:1px solid var(--border); display:flex; flex-direction:column; background:var(--card); }
+  .panel-header { padding:16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); }
+  .panel-header h2 { font-size:14px; font-weight:600; }
+  .new-btn { padding:6px 12px; border-radius:6px; background:var(--primary); color:#fff; border:none; font-size:12px; font-weight:600; cursor:pointer; }
+
+  /* Exam card */
+  .exam-list { flex:1; overflow-y:auto; padding:12px; }
+  .exam-card { padding:14px 16px; border-radius:10px; border:1px solid var(--border); margin-bottom:8px; cursor:pointer; transition:all .15s; }
+  .exam-card:hover { border-color:var(--primary); background:var(--bg); }
+  .exam-card.active { border-color:var(--primary); background:var(--primary)11; }
+  .exam-card .title { font-size:14px; font-weight:500; margin-bottom:4px; }
+  .exam-card .meta { font-size:11px; color:var(--muted); display:flex; gap:12px; margin-bottom:8px; }
+  .exam-card .progress-bar { height:4px; background:var(--bg); border-radius:2px; overflow:hidden; }
+  .exam-card .progress-fill { height:100%; border-radius:2px; transition:width .3s; }
+
+  /* Right panel: detail view */
+  .right-panel { flex:1; display:flex; flex-direction:column; min-width:0; }
+
+  /* Dashboard grid */
+  .dashboard { flex:1; overflow-y:auto; padding:24px 28px; }
+  .stat-grid { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:24px; }
+  .stat-card { padding:16px; border-radius:10px; border:1px solid var(--border); background:var(--card); }
+  .stat-card .label { font-size:11px; color:var(--muted); margin-bottom:4px; }
+  .stat-card .value { font-size:24px; font-weight:700; }
+  .stat-card .sub { font-size:11px; color:var(--muted); margin-top:2px; }
+
+  /* Knowledge mastery table */
+  .section-title { font-size:14px; font-weight:600; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+  .mastery-table { width:100%; border-collapse:collapse; margin-bottom:24px; }
+  .mastery-table th { text-align:left; font-size:11px; color:var(--muted); font-weight:500; padding:8px 12px; border-bottom:1px solid var(--border); }
+  .mastery-table td { padding:10px 12px; font-size:13px; border-bottom:1px solid var(--border); }
+  .mastery-bar { width:80px; height:6px; background:var(--bg); border-radius:3px; overflow:hidden; display:inline-block; vertical-align:middle; margin-right:8px; }
+  .mastery-bar .fill { height:100%; border-radius:3px; }
+
+  /* Task list */
+  .task-list { margin-bottom:24px; }
+  .task-item { display:flex; align-items:center; gap:12px; padding:10px 14px; border-radius:8px; border:1px solid var(--border); margin-bottom:6px; background:var(--card); }
+  .task-item .check { width:18px; height:18px; border-radius:4px; border:2px solid var(--border); flex-shrink:0; }
+  .task-item .check.done { background:var(--green); border-color:var(--green); }
+  .task-item .task-text { flex:1; font-size:13px; }
+  .task-item .task-kp { font-size:11px; color:var(--muted); }
+  .task-item .task-priority { font-size:10px; padding:2px 6px; border-radius:4px; font-weight:600; }
+
+  /* Chat panel at bottom */
+  .chat-panel { border-top:1px solid var(--border); background:var(--card); }
+  .chat-toggle { padding:10px 16px; display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; color:var(--muted); }
+  .chat-toggle:hover { color:var(--fg); }
+  .chat-expanded { padding:12px 16px; }
+  .chat-expanded .msg { padding:8px 12px; border-radius:8px; font-size:13px; margin-bottom:8px; }
+  .chat-expanded .msg.user { background:var(--primary); color:#fff; max-width:70%; margin-left:auto; text-align:right; }
+  .chat-expanded .msg.sys { background:var(--bg); border:1px solid var(--border); max-width:85%; }
+  .chat-expanded .composer { display:flex; gap:8px; margin-top:8px; }
+  .chat-expanded .composer input { flex:1; padding:8px 12px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--fg); font-size:13px; }
+  .chat-expanded .composer button { padding:8px 16px; border-radius:8px; background:var(--primary); color:#fff; border:none; font-size:12px; font-weight:600; }
+
+  .badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:600; }
+  .badge-green { background:#22c55e22; color:#4ade80; border:1px solid #22c55e44; }
+  .badge-amber { background:#f59e0b22; color:#fbbf24; border:1px solid #f59e0b44; }
+  .badge-purple { background:#7c3aed22; color:#a78bfa; border:1px solid #7c3aed44; }
+
+  .time-pressure { display:flex; align-items:center; gap:8px; padding:10px 14px; border-radius:8px; border:1px solid var(--amber); background:#f59e0b11; margin-bottom:16px; }
+  .time-pressure .icon { font-size:16px; }
+  .time-pressure .text { font-size:12px; color:var(--amber); }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="logo"></div>
+    <span>DeepTutor</span>
+  </div>
+  <nav class="nav">
+    <a class="nav-item" href="#">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      Chat
+    </a>
+    <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>TutorBot</a>
+    <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>Co-Writer</a>
+    <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Book</a>
+    <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>Knowledge</a>
+    <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Space</a>
+    <a class="nav-item active" href="#">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Exam Sprint
+    </a>
+    <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><circle cx="12" cy="12" r="10"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Memory</a>
+    <div class="nav-divider"></div>
+    <a class="nav-item" href="#"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</a>
+  </nav>
+</aside>
+
+<!-- Main content -->
+<div class="main">
+  <!-- Page header -->
+  <div class="page-header">
+    <h1>
+      <svg style="width:20px;height:20px;color:var(--purple)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Exam Sprint
+      <span class="badge badge-purple">独立模块</span>
+    </h1>
+    <p>基于时间压力的智能冲刺备考系统</p>
+    <div class="page-tabs">
+      <div class="page-tab active">仪表盘</div>
+      <div class="page-tab">任务列表</div>
+      <div class="page-tab">知识点图谱</div>
+      <div class="page-tab">历史记录</div>
+      <div class="page-tab">设置</div>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- Left: exam list -->
+    <div class="left-panel">
+      <div class="panel-header">
+        <h2>考试列表</h2>
+        <button class="new-btn">+ 新建考试</button>
+      </div>
+      <div class="exam-list">
+        <div class="exam-card active">
+          <div class="title">数字电子技术 期末考试</div>
+          <div class="meta">
+            <span>📅 2026-07-15</span>
+            <span>⏱ 剩余 9 天</span>
+          </div>
+          <div class="meta">
+            <span>5 个知识点</span>
+            <span>进度 23%</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:23%; background:var(--primary);"></div>
+          </div>
+        </div>
+        <div class="exam-card">
+          <div class="title">高等数学 B 期中</div>
+          <div class="meta">
+            <span>📅 2026-08-01</span>
+            <span>⏱ 剩余 26 天</span>
+          </div>
+          <div class="meta">
+            <span>8 个知识点</span>
+            <span>进度 0%</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:0%; background:var(--muted);"></div>
+          </div>
+        </div>
+        <div class="exam-card">
+          <div class="title">信号与系统 期末</div>
+          <div class="meta">
+            <span>📅 2026-07-20</span>
+            <span>⏱ 剩余 14 天</span>
+          </div>
+          <div class="meta">
+            <span>6 个知识点</span>
+            <span>进度 45%</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:45%; background:var(--green);"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: dashboard -->
+    <div class="right-panel">
+      <div class="dashboard">
+        <!-- Time pressure banner -->
+        <div class="time-pressure">
+          <span class="icon">⚡</span>
+          <span class="text"><strong>Sprint Week</strong> — 剩余 9 天，建议聚焦 Top-3 薄弱点</span>
+          <span class="badge badge-amber" style="margin-left:auto;">中等紧迫</span>
+        </div>
+
+        <!-- Stats -->
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="label">总体掌握度</div>
+            <div class="value">0.42</div>
+            <div class="sub">目标 ≥ 0.70</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">已诊断</div>
+            <div class="value">15 <span style="font-size:14px;color:var(--muted);">题</span></div>
+            <div class="sub">正确率 60%</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">今日任务</div>
+            <div class="value">3</div>
+            <div class="sub">已完成 1</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">剩余天数</div>
+            <div class="value" style="color:var(--amber);">9</div>
+            <div class="sub">Phase: Sprint Week</div>
+          </div>
+        </div>
+
+        <!-- Mastery table -->
+        <div class="section-title">📊 知识点掌握度</div>
+        <table class="mastery-table">
+          <thead>
+            <tr><th>知识点</th><th>掌握度</th><th>状态</th><th>诊断题数</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>傅里叶变换</td>
+              <td><div class="mastery-bar"><div class="fill" style="width:60%;background:var(--green);"></div></div>0.60</td>
+              <td><span class="badge badge-green">良好</span></td>
+              <td>3</td>
+            </tr>
+            <tr>
+              <td>拉普拉斯变换</td>
+              <td><div class="mastery-bar"><div class="fill" style="width:50%;background:var(--amber);"></div></div>0.50</td>
+              <td><span class="badge badge-amber">需提升</span></td>
+              <td>3</td>
+            </tr>
+            <tr>
+              <td>Z 变换</td>
+              <td><div class="mastery-bar"><div class="fill" style="width:30%;background:var(--red);"></div></div>0.30</td>
+              <td><span class="badge" style="background:#ef444422;color:#f87171;border:1px solid #ef444444;">薄弱</span></td>
+              <td>3</td>
+            </tr>
+            <tr>
+              <td>数字滤波器</td>
+              <td><div class="mastery-bar"><div class="fill" style="width:35%;background:var(--red);"></div></div>0.35</td>
+              <td><span class="badge" style="background:#ef444422;color:#f87171;border:1px solid #ef444444;">薄弱</span></td>
+              <td>3</td>
+            </tr>
+            <tr>
+              <td>采样定理</td>
+              <td><div class="mastery-bar"><div class="fill" style="width:45%;background:var(--amber);"></div></div>0.45</td>
+              <td><span class="badge badge-amber">需提升</span></td>
+              <td>3</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Today's tasks -->
+        <div class="section-title">📋 今日任务</div>
+        <div class="task-list">
+          <div class="task-item">
+            <div class="check done"></div>
+            <div class="task-text">复习 Z 变换基本性质与收敛域</div>
+            <div class="task-kp">Z 变换 · 0.30</div>
+            <div class="task-priority" style="background:var(--red)22;color:var(--red);">高</div>
+          </div>
+          <div class="task-item">
+            <div class="check"></div>
+            <div class="task-text">练习 IIR 滤波器设计题（3 道）</div>
+            <div class="task-kp">数字滤波器 · 0.35</div>
+            <div class="task-priority" style="background:var(--red)22;color:var(--red);">高</div>
+          </div>
+          <div class="task-item">
+            <div class="check"></div>
+            <div class="task-text">对比拉普拉斯变换与 Z 变换的映射关系</div>
+            <div class="task-kp">拉普拉斯变换 · 0.50</div>
+            <div class="task-priority" style="background:var(--amber)22;color:var(--amber);">中</div>
+          </div>
+        </div>
+
+        <!-- Embedded chat -->
+        <div class="section-title">💬 快速提问</div>
+        <div class="chat-panel">
+          <div class="chat-expanded">
+            <div class="msg sys">你正在冲刺「数字电子技术 期末考试」，有什么问题？</div>
+            <div class="msg user">Z 变换的收敛域怎么判断？</div>
+            <div class="msg sys">Z 变换的收敛域（ROC）是使 X(z) = Σ x[n]z^(-n) 收敛的 z 值集合。判断方法：<br><br>1. <strong>有限长序列</strong>：ROC 为整个 z 平面（可能除去 z=0 或 z=∞）<br>2. <strong>右边序列</strong>：ROC 为 |z| > r_max（最外极点）<br>3. <strong>左边序列</strong>：ROC 为 |z| < r_min（最内极点）<br>4. <strong>双边序列</strong>：ROC 为环形区域<br><br>需要我出几道练习题帮你巩固吗？</div>
+            <div class="composer">
+              <input type="text" placeholder="输入问题..." />
+              <button>发送</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
