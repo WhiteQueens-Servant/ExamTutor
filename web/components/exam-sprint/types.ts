@@ -4,6 +4,8 @@
  * V0: All data is mocked. Real data will come from backend in Phase 4.
  */
 
+import type { QuizQuestion } from "@/lib/quiz-types";
+
 export interface MasteryEntry {
   knowledge_point: string;
   score: number; // 0.0 - 1.0
@@ -57,3 +59,32 @@ export const MOCK_META: SprintMeta = {
   total_tasks_today: 4,
   completed_tasks_today: 1,
 };
+
+export const MOCK_QUIZ_QUESTIONS: QuizQuestion[] = [
+  {
+    question_id: "q1",
+    question: "卷积定理中，时域卷积对应频域的什么运算？",
+    question_type: "choice",
+    options: { A: "加法", B: "乘法", C: "除法", D: "卷积" },
+    correct_answer: "B",
+    explanation: "时域卷积定理：时域中的卷积对应频域中的乘法。",
+    difficulty: "easy",
+  },
+  {
+    question_id: "q2",
+    question: "傅里叶变换将信号从时域变换到频域。",
+    question_type: "concept",
+    options: { true: "True", false: "False" },
+    correct_answer: "true",
+    explanation: "傅里叶变换的核心作用就是时域到频域的转换。",
+    difficulty: "easy",
+  },
+  {
+    question_id: "q3",
+    question: "采样定理要求采样频率至少为信号最高频率的____倍。",
+    question_type: "fill_in_blank",
+    correct_answer: "2",
+    explanation: "奈奎斯特采样定理：fs ≥ 2fmax。",
+    difficulty: "medium",
+  },
+];

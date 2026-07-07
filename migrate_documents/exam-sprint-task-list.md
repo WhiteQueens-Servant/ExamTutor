@@ -57,22 +57,25 @@
 - [x] **3.3 时间压力横幅**
   - TopWeakBanner 组件（红色置顶）
 
-- [ ] **3.4 任务列表**
+- [x] **3.4 任务列表**
   - SprintTaskList 组件，任务卡片含「学习」「练题」按钮
 
-- [ ] **3.5 嵌入 QuizViewer**
+- [x] **3.5 嵌入 QuizViewer**
   - Drawer/SlideOver 中复用现有 QuizViewer 组件
 
-- [ ] ⬆ **[点停] 浏览器验证**：每一步截图确认 UI 渲染正确
+- [x] ⬆ **[点停] 浏览器验证**：每一步截图确认 UI 渲染正确
 
 #### 变更记录
 - 新建 `web/components/exam-sprint/types.ts`（类型定义 + mock 数据）
 - 新建 `web/components/exam-sprint/ExamMasteryTable.tsx`（掌握度表格 + 彩色进度条）
 - 新建 `web/components/exam-sprint/StatCards.tsx`（4 张统计卡片）
 - 新建 `web/components/exam-sprint/TopWeakBanner.tsx`（时间压力红色横幅）
-- 修改 `web/app/(workspace)/exam-sprint/page.tsx`（组装 Dashboard 上半部分）
+- 新建 `web/components/exam-sprint/SprintTaskList.tsx`（任务列表 + Learn/Practice 按钮）
+- 新建 `web/components/exam-sprint/QuizPreview.tsx`（轻量答题组件，无后端依赖）
+- 新建 `web/components/exam-sprint/QuizDrawer.tsx`（右侧抽屉容器）
+- 修改 `web/app/(workspace)/exam-sprint/page.tsx`（组装完整 Dashboard）
 - 修改 `web/locales/en/app.json` + `web/locales/zh/app.json`（新增 i18n 条目）
-- 问题：无
+- 问题：QuizViewer 有大量后端 API 依赖（notebook/session），无后端时崩溃。解决方案：创建轻量 QuizPreview 替代，V0 阶段不依赖后端
 
 ### Phase 4: 后端真实逻辑接入
 

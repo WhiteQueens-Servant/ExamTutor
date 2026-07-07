@@ -1,17 +1,33 @@
 "use client";
 
+import { useState } from "react";
 import { Target } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ExamMasteryTable } from "@/components/exam-sprint/ExamMasteryTable";
+import { QuizDrawer } from "@/components/exam-sprint/QuizDrawer";
+import { SprintTaskList } from "@/components/exam-sprint/SprintTaskList";
 import { StatCards } from "@/components/exam-sprint/StatCards";
 import { TopWeakBanner } from "@/components/exam-sprint/TopWeakBanner";
 import {
   MOCK_META,
   MOCK_MASTERY,
+  MOCK_TASKS,
+  MOCK_QUIZ_QUESTIONS,
 } from "@/components/exam-sprint/types";
+import type { SprintTask } from "@/components/exam-sprint/types";
 
 export default function ExamSprintPage() {
   const { t } = useTranslation();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerTitle, setDrawerTitle] = useState("");
+
+  const handleTaskAction = (task: SprintTask, action: "learn" | "practice") => {
+    if (action === "practice") {
+      setDrawerTitle(`${task.knowledge_point} — ${t("Practice")}`);
+      setDrawerOpen(true);
+    }
+    // "learn" action will be wired in Phase 4 (RAG + Markdown)
+  };
 
   return (
     <div className="flex h-full min-h-full flex-col overflow-hidden bg-[var(--background)]">
@@ -37,10 +53,21 @@ export default function ExamSprintPage() {
           {/* Stat cards */}
           <StatCards meta={MOCK_META} />
 
+          {/* Task list */}
+          <SprintTaskList tasks={MOCK_TASKS} onAction={handleTaskAction} />
+
           {/* Mastery table */}
           <ExamMasteryTable data={MOCK_MASTERY} />
         </div>
       </main>
+
+      {/* Quiz drawer */}
+      <QuizDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        questions={MOCK_QUIZ_QUESTIONS}
+        title={drawerTitle}
+      />
     </div>
   );
 }
