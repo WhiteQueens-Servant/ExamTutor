@@ -10,6 +10,7 @@ export interface GenerateQuestionsParams {
   num_questions?: number;
   difficulty?: string;
   language?: string;
+  kb_name?: string;
 }
 
 /**
@@ -28,6 +29,7 @@ export async function generateExamQuestions(
       num_questions: params.num_questions ?? 3,
       difficulty: params.difficulty ?? "",
       language: params.language ?? "zh",
+      kb_name: params.kb_name ?? "",
     }),
   });
 

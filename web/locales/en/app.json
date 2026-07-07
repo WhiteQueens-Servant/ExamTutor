@@ -2085,5 +2085,6 @@
   "L2 · curated": "L2 · curated",
   "L1 · raw trace": "L1 · raw trace",
   "Click to lock · open in workbench": "Click to lock · open in workbench",
-  "Hover a node to preview the memory. Click to lock the highlight and trace its references inward (L1 → L2 → L3) or outward.": "Hover a node to preview the memory. Click to lock the highlight and trace its references inward (L1 → L2 → L3) or outward."
+  "Hover a node to preview the memory. Click to lock the highlight and trace its references inward (L1 → L2 → L3) or outward.": "Hover a node to preview the memory. Click to lock the highlight and trace its references inward (L1 → L2 → L3) or outward.",
+  "No knowledge base (LLM only)": "No knowledge base (LLM only)"
 }

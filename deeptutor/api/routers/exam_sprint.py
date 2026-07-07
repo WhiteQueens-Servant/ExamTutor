@@ -19,6 +19,7 @@ class GenerateQuestionsRequest(BaseModel):
     num_questions: int = Field(3, ge=1, le=20, description="Number of questions to generate")
     difficulty: str = Field("", description="Difficulty level: easy, medium, hard, or auto")
     language: str = Field("zh", description="Language code for question generation")
+    kb_name: str = Field("", description="Knowledge base name for RAG-scoped retrieval. Empty = no RAG.")
 
 
 @router.post("/generate-questions")
@@ -35,9 +36,35 @@ async def generate_questions(req: GenerateQuestionsRequest) -> list[dict[str, An
     from deeptutor.services.config import load_config_with_main
 
     session_id = str(uuid.uuid4())
+
+    # RAG-scoped retrieval: search the selected KB for relevant context
+    rag_context = ""
+    if req.kb_name.strip():
+        try:
+            from deeptutor.multi_user.knowledge_access import resolve_for_rag
+            from deeptutor.services.rag.service import RAGService
+
+            resource = resolve_for_rag(req.kb_name)
+            if resource is not None:
+                rag_service = RAGService(kb_base_dir=str(resource.base_dir))
+                rag_result = await rag_service.search(
+                    query=req.topic,
+                    kb_name=resource.name,
+                )
+                answer = rag_result.get("answer") or rag_result.get("content") or ""
+                if answer:
+                    rag_context = f"\n\nRelevant knowledge base context:\n{answer}"
+                    logger.info("RAG retrieved %d chars for topic=%s", len(answer), req.topic)
+            else:
+                logger.warning("KB '%s' not accessible, proceeding without RAG", req.kb_name)
+        except Exception as exc:
+            logger.warning("RAG search failed for kb=%s: %s — falling back to LLM only", req.kb_name, exc)
+
+    # Build the user message, optionally including RAG context
     user_message = (
         f"Generate {req.num_questions} practice questions about: {req.topic}. "
         f"Focus on testing understanding of core concepts."
+        f"{rag_context}"
     )
 
     context = UnifiedContext(

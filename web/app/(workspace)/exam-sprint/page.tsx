@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Target } from "lucide-react";
+import { Database, Target } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ExamMasteryTable } from "@/components/exam-sprint/ExamMasteryTable";
 import { QuizDrawer } from "@/components/exam-sprint/QuizDrawer";
@@ -16,9 +16,12 @@ import {
 import type { SprintTask } from "@/components/exam-sprint/types";
 import type { QuizQuestion } from "@/lib/quiz-types";
 import { generateExamQuestions } from "@/lib/exam-sprint-api";
+import { useKnowledgeBases } from "@/hooks/useKnowledgeBases";
 
 export default function ExamSprintPage() {
   const { t } = useTranslation();
+  const { kbs, loading: kbLoading } = useKnowledgeBases();
+  const [selectedKb, setSelectedKb] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerTitle, setDrawerTitle] = useState("");
   const [drawerQuestions, setDrawerQuestions] = useState<QuizQuestion[]>([]);
@@ -39,6 +42,7 @@ export default function ExamSprintPage() {
             topic: task.knowledge_point,
             num_questions: 3,
             language: "zh",
+            kb_name: selectedKb,
           });
           setDrawerQuestions(questions);
         } catch (err) {
@@ -50,7 +54,7 @@ export default function ExamSprintPage() {
       }
       // "learn" action will be wired in Phase 4 (RAG + Markdown)
     },
-    [t],
+    [t, selectedKb],
   );
 
   return (
@@ -66,6 +70,25 @@ export default function ExamSprintPage() {
               {MOCK_META.exam_name}
             </div>
           </div>
+        </div>
+
+        {/* Knowledge Base selector */}
+        <div className="flex items-center gap-2">
+          <Database size={14} className="text-[var(--muted-foreground)]" />
+          <select
+            value={selectedKb}
+            onChange={(e) => setSelectedKb(e.target.value)}
+            disabled={kbLoading}
+            className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-[13px] text-[var(--foreground)] outline-none focus:border-[var(--primary)]/40"
+          >
+            <option value="">{t("No knowledge base (LLM only)")}</option>
+            {kbs.map((kb) => (
+              <option key={kb.name} value={kb.name}>
+                {kb.name}
+                {kb.is_default ? ` (${t("default")})` : ""}
+              </option>
+            ))}
+          </select>
         </div>
       </header>
 
