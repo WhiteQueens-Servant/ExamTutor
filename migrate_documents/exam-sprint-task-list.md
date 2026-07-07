@@ -286,6 +286,18 @@
 - 验证：pytest 22/22 通过，TypeScript 编译通过
 - 注意：mastery.py 保留但不再被 API 使用（向后兼容），后续可清理
 
+##### Phase 5.2 冷启动向导多步骤
+- 修改 `deeptutor/api/routers/exam_sprint.py`（新增 POST /diagnosis/generate + POST /diagnosis/submit 端点）
+- 重写 `web/components/exam-sprint/SetupModal.tsx`（四步向导：考试信息 → 创建KB → 诊断测评 → 完成）
+- 修改 `web/app/(workspace)/exam-sprint/page.tsx`（适配新 SetupModal onComplete 接口，诊断结果驱动 mastery）
+- 修改 `web/lib/exam-sprint-api.ts`（新增 generateDiagnosis/submitDiagnosis API + 类型定义）
+- 修改 `web/components/exam-sprint/types.ts`（MasteryEntry.surface 新增 "diagnosis"）
+- 修改 `web/components/exam-sprint/ExamMasteryTable.tsx`（SURFACE_LABELS 新增 "Diagnosis"）
+- 修改 `web/locales/en/app.json` + `web/locales/zh/app.json`（新增向导步骤 i18n key）
+- 验证：浏览器端到端流程跑通 — 四步向导正确切换，诊断数据正确流入 Dashboard
+- 注意：诊断题目生成依赖 QuestionPipeline（60-120秒），首次测试因 LLM 超时需重试
+- 注意：冷启动检测改为检查 `onboarding_completed` 字段
+
 （执行中遇到的问题和修改记录在此）
 
 ---
