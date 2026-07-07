@@ -15,18 +15,21 @@
 
 ### Phase 1: 前端骨架
 
-- [ ] **1.1 Sidebar 入口**
+- [x] **1.1 Sidebar 入口**
   - `PRIMARY_NAV` 添加 Exam Sprint（图标 + 路由 `/exam-sprint`）
   - 文件：`web/components/sidebar/SidebarShell.tsx`
 
-- [ ] **1.2 页面路由 + 空壳**
+- [x] **1.2 页面路由 + 空壳**
   - 创建 `web/app/(workspace)/exam-sprint/page.tsx`
   - 基础布局：标题 + 占位区域
 
-- [ ] ⬆ **[点停] 浏览器验证**：Sidebar 显示 Exam Sprint 入口，点击跳转正确，空壳页面渲染正常
+- [x] ⬆ **[点停] 浏览器验证**：Sidebar 显示 Exam Sprint 入口，点击跳转正确，空壳页面渲染正常
 
 #### 变更记录
-（执行中遇到的问题和修改记录在此）
+- 修改文件：`web/components/sidebar/SidebarShell.tsx`（添加 Target 图标 import + PRIMARY_NAV 新增条目）
+- 新建文件：`web/app/(workspace)/exam-sprint/page.tsx`（空壳页面）
+- 修改文件：`web/locales/en/app.json` + `web/locales/zh/app.json`（添加 Exam Sprint i18n 条目）
+- 问题：无（Console 报错为预存的 session API 未连接问题，与本次改动无关）
 
 ### Phase 2: 后端 Capability 注册
 

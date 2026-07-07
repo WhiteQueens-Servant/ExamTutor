@@ -1773,6 +1773,8 @@
   "Configure web search providers. Used by the web_search tool and any agent step that hits the open web.": "Configure web search providers. Used by the web_search tool and any agent step that hits the open web.",
   "{{count}} profiles": "{{count}} profiles",
   "Memory tooltip": "Memory tooltip",
+  "Exam Sprint": "Exam Sprint",
+  "Exam Sprint tooltip": "Exam preparation with time-pressure planning.",
   "Browse L1 trace for this surface": "Browse L1 trace for this surface",
   "L1 trace · {{surface}}": "L1 trace · {{surface}}",
   "{{count}} events": "{{count}} events",

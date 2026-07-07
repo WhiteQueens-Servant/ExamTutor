@@ -1761,6 +1761,8 @@
   "Knowledge tooltip": "管理文档与教学人设。",
   "Space tooltip": "你的个人学习空间。",
   "Memory tooltip": "助手跨会话保留的长期记忆。",
+  "Exam Sprint": "Exam Sprint",
+  "Exam Sprint tooltip": "基于时间压力规划的备考冲刺。",
   "Browse L1 trace for this surface": "浏览该面的 L1 原始事件",
   "L1 trace · {{surface}}": "L1 原始事件 · {{surface}}",
   "{{count}} events": "{{count}} 条事件",

@@ -19,6 +19,7 @@ import {
   PanelLeftOpen,
   PenLine,
   Settings,
+  Target,
   type LucideIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -71,6 +72,12 @@ const PRIMARY_NAV: NavEntry[] = [
     label: "Memory",
     icon: Brain,
     tooltipKey: "Memory tooltip",
+  },
+  {
+    href: "/exam-sprint",
+    label: "Exam Sprint",
+    icon: Target,
+    tooltipKey: "Exam Sprint tooltip",
   },
 ];
 

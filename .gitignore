@@ -288,3 +288,5 @@ celerybeat.pid
 !demo/*.mp4
 web/debug-*.js
 web/debug-*.png
+.playwright-mcp/
+.codegraph/
