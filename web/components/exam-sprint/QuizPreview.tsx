@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CheckCircle, XCircle } from "lucide-react";
+import MarkdownRenderer from "@/components/common/MarkdownRenderer";
 import type { QuizQuestion } from "@/lib/quiz-types";
 
 /**
@@ -60,7 +61,7 @@ export function QuizPreview({ questions }: { questions: QuizQuestion[] }) {
 
       {/* Question */}
       <div className="text-sm font-medium text-[var(--foreground)]">
-        {q.question}
+        <MarkdownRenderer content={q.question} enableMath enableCode={false} />
       </div>
 
       {/* Options */}
@@ -81,7 +82,7 @@ export function QuizPreview({ questions }: { questions: QuizQuestion[] }) {
                 } ${isSubmitted && key === q.correct_answer ? "border-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20" : ""} ${isSubmitted && selected && !isCorrect ? "border-rose-300 bg-rose-50/50 dark:bg-rose-950/20" : ""}`}
               >
                 <span className="font-mono text-xs">{key}</span>
-                <span>{label}</span>
+                <span><MarkdownRenderer content={label} enableMath enableCode={false} /></span>
                 {isSubmitted && key === q.correct_answer && (
                   <CheckCircle size={14} className="ml-auto text-emerald-500" />
                 )}
@@ -143,7 +144,9 @@ export function QuizPreview({ questions }: { questions: QuizQuestion[] }) {
         >
           {isCorrect ? "Correct!" : `Incorrect. Answer: ${q.correct_answer}`}
           {q.explanation && (
-            <div className="mt-1 text-xs opacity-80">{q.explanation}</div>
+            <div className="mt-1 text-xs opacity-80">
+              <MarkdownRenderer content={q.explanation} enableMath enableCode={false} />
+            </div>
           )}
         </div>
       )}
