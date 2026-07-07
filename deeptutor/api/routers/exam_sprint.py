@@ -146,6 +146,9 @@ class ExamStateRequest(BaseModel):
     exam_name: str = Field(..., min_length=1, description="Exam name (e.g. '信号与系统 期末考试')")
     exam_date: str = Field(..., description="Exam date in YYYY-MM-DD format")
     daily_budget_minutes: int = Field(120, ge=10, le=480, description="Daily study budget in minutes")
+    onboarding_completed: bool = Field(False, description="Whether onboarding wizard is completed")
+    diagnosis_completed: bool = Field(False, description="Whether diagnosis quiz is completed")
+    kb_name: str = Field("", description="Associated knowledge base name")
 
 
 @router.post("/state")
@@ -157,6 +160,9 @@ async def save_exam_state(req: ExamStateRequest) -> dict[str, Any]:
         exam_name=req.exam_name,
         exam_date=req.exam_date,
         daily_budget_minutes=req.daily_budget_minutes,
+        onboarding_completed=req.onboarding_completed,
+        diagnosis_completed=req.diagnosis_completed,
+        kb_name=req.kb_name,
     )
 
 
@@ -168,7 +174,7 @@ async def save_exam_state(req: ExamStateRequest) -> dict[str, Any]:
 @router.get("/mastery")
 async def get_mastery() -> list[dict[str, Any]]:
     """Return all mastery entries for the Exam Sprint dashboard."""
-    from deeptutor.exam.mastery import load_mastery
+    from deeptutor.exam.profile import load_mastery
 
     return load_mastery()
 
@@ -185,7 +191,7 @@ async def update_mastery(req: MasteryUpdateRequest) -> list[dict[str, Any]]:
 
     Returns the full updated mastery list.
     """
-    from deeptutor.exam.mastery import update_mastery_score
+    from deeptutor.exam.profile import update_mastery_score
 
     return update_mastery_score(
         knowledge_point=req.knowledge_point,
@@ -215,7 +221,7 @@ async def generate_learn_content(req: LearnRequest) -> dict[str, Any]:
     3. LLM generates stage-aware, mastery-calibrated learning content
     4. Returns Markdown content + source info
     """
-    from deeptutor.exam.mastery import load_mastery
+    from deeptutor.exam.profile import load_mastery
     from deeptutor.services.llm import get_llm_client
 
     # 1. Read mastery for this knowledge point
@@ -297,3 +303,34 @@ async def generate_learn_content(req: LearnRequest) -> dict[str, Any]:
         "source": source,
         "mastery_score": mastery_score,
     }
+
+
+# ---------------------------------------------------------------------------
+# Profile endpoint — full user profile (system + user facing)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/profile")
+async def get_profile() -> dict[str, Any]:
+    """Return the full user profile (knowledge_points + diagnosis)."""
+    from deeptutor.exam.profile import load_profile
+
+    return load_profile()
+
+
+# ---------------------------------------------------------------------------
+# State reset — destructive, clears all exam data
+# ---------------------------------------------------------------------------
+
+
+@router.post("/state/reset")
+async def reset_exam_state() -> dict[str, str]:
+    """Reset all exam state to defaults.
+
+    Deletes: state.json, profile.json, learn_history/, practice_history.json.
+    Requires user confirmation on the frontend before calling.
+    """
+    from deeptutor.exam.state import reset_state
+
+    reset_state()
+    return {"status": "ok", "message": "All exam data has been reset"}

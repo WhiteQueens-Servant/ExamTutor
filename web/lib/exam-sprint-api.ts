@@ -55,6 +55,9 @@ export interface ExamState {
   daily_budget_minutes: number;
   total_tasks_today: number;
   completed_tasks_today: number;
+  onboarding_completed: boolean;
+  diagnosis_completed: boolean;
+  kb_name: string;
 }
 
 /**
@@ -76,6 +79,9 @@ export async function saveExamState(params: {
   exam_name: string;
   exam_date: string;
   daily_budget_minutes?: number;
+  onboarding_completed?: boolean;
+  diagnosis_completed?: boolean;
+  kb_name?: string;
 }): Promise<ExamState> {
   const res = await apiFetch(apiUrl("/api/v1/exam-sprint/state"), {
     method: "POST",
@@ -84,6 +90,9 @@ export async function saveExamState(params: {
       exam_name: params.exam_name,
       exam_date: params.exam_date,
       daily_budget_minutes: params.daily_budget_minutes ?? 120,
+      onboarding_completed: params.onboarding_completed ?? false,
+      diagnosis_completed: params.diagnosis_completed ?? false,
+      kb_name: params.kb_name ?? "",
     }),
   });
   if (!res.ok) {
@@ -132,4 +141,75 @@ export async function generateLearnContent(
   }
 
   return await res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Profile (full user profile)
+// ---------------------------------------------------------------------------
+
+export interface KnowledgePoint {
+  name: string;
+  chapter: string;
+  score: number;
+  total_questions: number;
+  correct: number;
+  error_types: string[];
+  last_practiced: string;
+  practice_count: number;
+  last_surface: string;
+}
+
+export interface DiagnosisReport {
+  completed_at: string;
+  total_questions: number;
+  correct: number;
+  overall_score: number;
+  questions: Array<{
+    question_id: string;
+    question: string;
+    correct_answer: string;
+    user_answer: string;
+    is_correct: boolean;
+    error_type: string;
+    knowledge_point: string;
+  }>;
+  weak_points: string[];
+  strong_points: string[];
+}
+
+export interface UserProfile {
+  exam_name: string;
+  created_at: string;
+  last_updated: string;
+  knowledge_points: KnowledgePoint[];
+  diagnosis: DiagnosisReport | null;
+}
+
+/**
+ * Fetch the full user profile (knowledge_points + diagnosis).
+ */
+export async function fetchProfile(): Promise<UserProfile> {
+  const res = await apiFetch(apiUrl("/api/v1/exam-sprint/profile"));
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`Failed to fetch profile (${res.status}): ${detail}`);
+  }
+  return await res.json();
+}
+
+// ---------------------------------------------------------------------------
+// State reset
+// ---------------------------------------------------------------------------
+
+/**
+ * Reset all exam state (requires user confirmation before calling).
+ */
+export async function resetExamState(): Promise<void> {
+  const res = await apiFetch(apiUrl("/api/v1/exam-sprint/state/reset"), {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`Failed to reset state (${res.status}): ${detail}`);
+  }
 }

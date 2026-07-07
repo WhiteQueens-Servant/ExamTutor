@@ -30,6 +30,9 @@ DEFAULT_STATE: dict[str, Any] = {
     "daily_budget_minutes": 120,
     "total_tasks_today": 0,
     "completed_tasks_today": 0,
+    "onboarding_completed": False,
+    "diagnosis_completed": False,
+    "kb_name": "",
 }
 
 
@@ -88,3 +91,36 @@ def update_state(**kwargs: Any) -> dict[str, Any]:
     state.update(kwargs)
     save_state(state)
     return state
+
+
+def reset_state() -> None:
+    """Reset all exam state to defaults and delete profile/history files.
+
+    This is a destructive operation — clears state.json, profile.json,
+    learn_history/, and practice_history.json.
+    """
+    from deeptutor.exam.profile import reset_profile
+
+    # Reset state.json to defaults
+    save_state({**DEFAULT_STATE})
+
+    # Delete profile.json
+    reset_profile()
+
+    # Delete learn_history directory
+    from deeptutor.runtime.home import get_runtime_data_root
+
+    base = get_runtime_data_root() / _STATE_DIR
+    learn_dir = base / "learn_history"
+    if learn_dir.exists():
+        import shutil
+        shutil.rmtree(learn_dir)
+        logger.info("Deleted learn_history: %s", learn_dir)
+
+    # Delete practice_history.json
+    practice_file = base / "practice_history.json"
+    if practice_file.exists():
+        practice_file.unlink()
+        logger.info("Deleted practice_history: %s", practice_file)
+
+    logger.info("Full state reset completed")

@@ -157,28 +157,106 @@
 - 验证：浏览器端到端流程跑通 — 点击 Learn → Drawer 打开 → loading → LLM 生成学习材料 → Markdown + LaTeX 正确渲染
 - 注意：LLM 生成耗时约 60-120 秒，内容包含概念解释、核心公式、典型例题、要点总结
 
-### Phase 5: 收尾
+### Phase 5: 业务闭环（V0 核心链路）
 
-- [x] **5.1 冷启动流程**
-  - 首次使用引导（选科目 → 设考试日期 → RAG 入库 → 初始化 mastery）
+> V0 目标：完整业务闭环——冷启动全链路（考试信息 → 资料上传 → 诊断测评 → 初始掌握度 → 每日循环）跑通。
+> 数据架构设计见 `migrate_documents/exam-sprint-data-architecture.md`。
+> V1 目标：底层性能调优（RAG 检索策略、Reranking、文档切分参数、LLM 推理速度、Prompt Engineering）。
 
-- [ ] **5.2 阶段自动切换（lazy hook）**
-  - 用户访问时计算当前阶段 vs 存储阶段，差异则触发 replan
+#### 5.1 数据层重构（profile.json 统一数据源）
 
-- [ ] **5.3 连续天数追踪**
-  - `## Sprint` 字段记录 streak + last_active
+> 将 mastery.json 合并进 profile.json，建立统一的用户画像数据结构。
 
-- [ ] **5.4 Exam Sprint 内知识库上传**
-  - 在 Exam Sprint Dashboard 知识库选择器旁增加「新建/上传」入口
-  - 复用现有 `createKnowledgeBase` + `uploadKnowledgeBaseFiles` API（`web/lib/knowledge-api.ts`）
-  - 上传完成后自动索引 + 自动选中新创建的 KB
-  - 用户无需跳转 Knowledge Base 页面即可完成材料上传
+- [ ] **5.1.1 重构 profile 模块**
+  - 新建 `deeptutor/exam/profile.py`（替代 mastery.py）
+  - 数据结构：`profile.json`（knowledge_points 数组 + diagnosis 对象）
+  - API：`load_profile()` / `save_profile()` / `update_score()` / `init_from_diagnosis()`
+  - 首次诊断初始化时直接写入原始正确率（非 EMA），后续练习用 EMA 更新
 
-- [ ] ⬆ **[点停] 最终验证**：完整用户旅程浏览器跑一遍
+- [ ] **5.1.2 API 适配**
+  - `GET /mastery` → 从 profile.json 读 knowledge_points
+  - `POST /mastery/update` → 更新 profile.json
+  - 新增 `GET /profile` → 返回完整画像
+  - 去掉 mastery.json 依赖
+
+- [ ] **5.1.3 state.py 扩展**
+  - 新增字段：`onboarding_completed`、`diagnosis_completed`、`kb_name`
+  - 新增 `is_cold_start()` 逻辑：检查 exam_name/exam_date 为空
+  - 新增 `reset_state()` → 清空全部数据（state + profile + history）
+
+- [ ] ⬆ **[点停] pytest 验证**：profile 读写 + state 扩展 + mastery API 兼容
+
+#### 5.2 冷启动向导（SetupModal 多步骤）
+
+> 将当前单步 SetupModal 改为四步向导。
+
+**Step 1: 考试信息（已完成 ✅）**
+- [x] 考试名称、考试日期、每日可用时间
+- [x] 写入 state.json
+
+**Step 2: 创建知识库（待实现）**
+- [ ] KB 名称输入（默认用考试名称填充）
+- [ ] 上传课程资料文档（可选，可为空）
+  - 复用 `createKnowledgeBase` + `uploadKnowledgeBaseFiles` API
+  - 上传完成后自动索引 + 写入 state.json.kb_name
+- [ ] 跳过提示："跳过后学习材料将基于通用知识生成，建议上传课程资料以获得更精准的内容"
+
+**Step 3: 诊断测评（待实现）**
+- [ ] 后端：`POST /diagnosis/generate` 端点
+  - 有 KB → RAG 检索 → LLM 出题；无 KB → LLM 直接出题
+  - 题数由 LLM 根据 KB 内容/考试范围动态决定（不硬编码）
+- [ ] 前端：诊断测评 Drawer（复用 QuizDrawer 样式）
+- [ ] 后端：`POST /diagnosis/submit` 端点
+  - 接收作答结果 → 按知识点汇总 → 初始化 profile.json
+  - 首次写入直接用原始正确率，不走 EMA
+
+**Step 4: 完成**
+- [ ] 展示诊断结果概览（分数 + 薄弱点）
+- [ ] 写入 state.json.onboarding_completed = true
+
+- [ ] ⬆ **[点停] 浏览器验证**：完整冷启动流程跑通
+
+#### 5.3 内容持久化
+
+> 解决"生成内容无落点"问题。
+
+**5.3.1 学习材料持久化**
+- [ ] 后端：`POST /learn` 增加 learn_history 保存
+  - 生成的 Markdown 保存到 `data/exam_sprint/learn_history/YYYY-MM-DD_HH-MM_<知识点>.md`
+- [ ] 后端：`GET /learn/history` → 列出已保存的学习材料
+- [ ] 前端：LearnDrawer 增加"已保存"提示 + 历史记录入口
+
+**5.3.2 练习错题持久化**
+- [ ] 后端：`POST /diagnosis/submit` / Practice submit 时，错题写入 `practice_history.json`
+- [ ] 后端：`GET /practice/history` → 读取错题历史
+- [ ] 前端：Dashboard 增加"错题本"入口（查看历史错题）
+
+**5.3.3 诊断报告持久化**
+- [ ] 诊断结果保存到 profile.json 的 diagnosis 对象
+- [ ] 前端：Dashboard 增加"诊断报告"入口（查看完整诊断：每题解析+错因）
+
+- [ ] ⬆ **[点停] 浏览器验证**：Learn/Practice 后内容可回看，诊断报告可查看
+
+#### 5.4 Dashboard 增强
+
+> 将真实数据接入 Dashboard 组件。
+
+- [ ] **掌握度表格**：数据来自 profile.json（已有，适配新数据源）
+- [ ] **TopWeakBanner**：数据来自 profile.json.weak_points（已有）
+- [ ] **新增：诊断报告入口** → 展示 diagnosis 对象内容
+- [ ] **新增：错题本入口** → 展示 practice_history.json 内容
+- [ ] **新增：学习历史入口** → 列出 learn_history/ 文件
+- [ ] **新增：重置按钮**（含确认弹窗）→ 调用 POST /state/reset
+
+- [ ] ⬆ **[点停] 浏览器验证**：Dashboard 各入口功能正常
+
+#### 5.5 最终验证
+
+- [ ] 完整用户旅程浏览器跑一遍：冷启动 → 上传资料 → 诊断 → Dashboard → Learn → Practice → 错题回看 → 重置
 
 #### 变更记录
 
-##### Phase 5.1
+##### Phase 5.1（已完成——考试信息收集）
 - 新建 `deeptutor/exam/state.py`（考试状态存储模块：load_state / save_state / is_cold_start / update_state）
 - 修改 `deeptutor/api/routers/exam_sprint.py`（新增 GET /state + POST /state 端点）
 - 修改 `web/lib/exam-sprint-api.ts`（新增 fetchExamState / saveExamState API）
@@ -186,7 +264,27 @@
 - 修改 `web/app/(workspace)/exam-sprint/page.tsx`（集成 SetupModal，替换 MOCK_META 为真实 exam state，自动计算 phase/days_remaining）
 - 修改 `web/locales/en/app.json` + `web/locales/zh/app.json`（新增 Setup 相关 i18n key）
 - 验证：浏览器端到端流程跑通 — 首次访问弹出 SetupModal → 填写考试信息 → 提交 → Dashboard 显示真实考试名称和剩余天数
-- 注意：V0 冷启动仅收集考试信息，诊断评估和能力画像留待后续迭代
+
+##### Phase 5 架构重构
+- 新建 `migrate_documents/exam-sprint-data-architecture.md`（数据架构设计文档）
+- 任务列表重构：Phase 5 拆分为 5.1-5.5，覆盖数据层/冷启动/持久化/Dashboard/验证
+- mastery.json 合并进 profile.json（统一用户画像数据源）
+- 新增内容持久化：learn_history/ + practice_history.json + diagnosis 存储
+- 新增用户状态机：onboarding_completed / diagnosis_completed / reset
+
+##### Phase 5.1 数据层重构
+- 新建 `deeptutor/exam/profile.py`（替代 mastery.py，统一用户画像+掌握度数据源）
+  - `load_profile()` / `save_profile()` — 完整 profile 读写
+  - `load_mastery()` — 兼容层，从 profile.json 读取 legacy 格式
+  - `update_mastery_score()` — EMA 更新（已有知识点）/ 直接写入（新知识点）
+  - `init_from_diagnosis()` — 诊断结果初始化 profile
+  - `reset_profile()` — 清空 profile 文件
+- 修改 `deeptutor/exam/state.py` — 新增 `onboarding_completed`、`diagnosis_completed`、`kb_name` 字段 + `reset_state()` 函数
+- 修改 `deeptutor/api/routers/exam_sprint.py` — mastery 端点改用 profile.py；新增 `GET /profile`、`POST /state/reset` 端点；`POST /state` 接收新字段
+- 修改 `web/lib/exam-sprint-api.ts` — ExamState 新增字段；新增 KnowledgePoint/DiagnosisReport/UserProfile 类型；新增 fetchProfile/resetExamState API
+- 新建 `tests/exam/test_profile.py`（10 个测试用例，全部通过）
+- 验证：pytest 22/22 通过，TypeScript 编译通过
+- 注意：mastery.py 保留但不再被 API 使用（向后兼容），后续可清理
 
 （执行中遇到的问题和修改记录在此）
 
@@ -223,3 +321,4 @@
 6. **Git 推送方式**：始终使用 `git -c http.proxy="" -c https.proxy="" push`（绕过本地代理）
 7. **知识库隔离**：RAG 查询通过 `kb_name` 参数限定范围，不跨 KB 检索。Exam Sprint 支持用户选择/创建专属知识库
 8. **验证方式**：全部采用 web 模式（后端 `deeptutor serve` + 前端 `npm run dev` + Playwright + 手动实操），不使用 deeptutor CLI
+9. **数据架构**：数据持久化方案见 `migrate_documents/exam-sprint-data-architecture.md`，实现前必须阅读
