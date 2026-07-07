@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { QuizQuestion } from "@/lib/quiz-types";
 import { QuizPreview } from "./QuizPreview";
@@ -10,6 +10,8 @@ interface QuizDrawerProps {
   onClose: () => void;
   questions: QuizQuestion[];
   title?: string;
+  loading?: boolean;
+  error?: string | null;
 }
 
 export function QuizDrawer({
@@ -17,6 +19,8 @@ export function QuizDrawer({
   onClose,
   questions,
   title,
+  loading = false,
+  error = null,
 }: QuizDrawerProps) {
   const { t } = useTranslation();
 
@@ -39,7 +43,11 @@ export function QuizDrawer({
               {title || t("Practice")}
             </div>
             <div className="text-[11px] text-[var(--muted-foreground)]">
-              {questions.length} {t("questions")}
+              {loading
+                ? t("Generating questions...")
+                : error
+                  ? t("Error")
+                  : `${questions.length} ${t("questions")}`}
             </div>
           </div>
           <button
@@ -53,7 +61,30 @@ export function QuizDrawer({
 
         {/* Quiz body */}
         <div className="flex-1 overflow-y-auto px-4 py-4">
-          <QuizPreview questions={questions} />
+          {loading && (
+            <div className="flex flex-col items-center justify-center gap-3 py-16">
+              <Loader2 size={24} className="animate-spin text-[var(--primary)]" />
+              <div className="text-sm text-[var(--muted-foreground)]">
+                {t("Generating questions...")}
+              </div>
+            </div>
+          )}
+
+          {error && !loading && (
+            <div className="rounded-lg border border-rose-200 bg-rose-50/50 px-4 py-3 text-sm text-rose-700 dark:border-rose-800/30 dark:bg-rose-950/20 dark:text-rose-300">
+              {error}
+            </div>
+          )}
+
+          {!loading && !error && questions.length > 0 && (
+            <QuizPreview questions={questions} />
+          )}
+
+          {!loading && !error && questions.length === 0 && (
+            <div className="py-10 text-center text-sm text-[var(--muted-foreground)]">
+              {t("No questions available.")}
+            </div>
+          )}
         </div>
       </div>
     </>

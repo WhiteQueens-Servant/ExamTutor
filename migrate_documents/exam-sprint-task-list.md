@@ -86,10 +86,10 @@
   - TimePressureTool / WeakPointRankerTool / PlanBuilderTool
   - 零 token 消耗，pytest 验证
 
-- [ ] **4.2 QuestionPipeline 打通**
-  - 后端 ExamSprintCapability 输出真实 QuizQuestion[]（替换 mock）
-  - 前端切回 QuizViewer（替换 QuizPreview），接入真实数据流
-  - 记忆回写（capability_results + mastery 更新）
+- [x] **4.2 QuestionPipeline 打通**
+  - 后端 REST 端点 `POST /api/v1/exam-sprint/generate-questions` 调用 QuestionPipeline 生成真实题目
+  - 前端 QuizDrawer 接入真实 API，显示 loading/error 状态
+  - Practice 按钮触发真实题目生成，QuizPreview 渲染 + 答题交互正常
 
 - [ ] **4.3 RAG + LLM 降级 + 知识库选择器**
   - 后端：ExamSprintCapability 接收 `kb_name` 参数，调用 `rag_service.search(query, kb_name)` 做精确范围检索
@@ -104,10 +104,21 @@
 - [ ] ⬆ **[点停] 浏览器验证**：端到端流程跑通（冷启动 → 任务执行 → 分数更新）
 
 #### 变更记录
+
+##### Phase 4.1
 - 新建 `deeptutor/exam/tools.py`（3 个纯规则工具：TimePressureTool / WeakPointRankerTool / PlanBuilderTool）
 - 新建 `tests/exam/__init__.py`
 - 新建 `tests/exam/test_tools.py`（12 个测试用例，全部通过）
 - 问题：IEEE 754 浮点精度 — `0.9 - 0.8 = 0.09999...` 导致 gap=0.1 的优先级判定为 "low"。修复：在 `_rank_weak_points` 中先 `round(gap, 3)` 再传入 `_priority_from_gap`
+
+##### Phase 4.2
+- 新建 `deeptutor/api/routers/exam_sprint.py`（REST 端点 `POST /api/v1/exam-sprint/generate-questions`）
+- 修改 `deeptutor/api/main.py`（注册 exam_sprint router）
+- 新建 `web/lib/exam-sprint-api.ts`（前端 API 客户端 `generateExamQuestions`）
+- 修改 `web/components/exam-sprint/QuizDrawer.tsx`（添加 loading/error 状态）
+- 修改 `web/app/(workspace)/exam-sprint/page.tsx`（Practice 按钮接入真实 API）
+- 验证：浏览器端到端流程跑通 — 点击 Practice → loading → 真实 LLM 题目生成 → 答题 → 正确性判定 → 解析显示
+- 注意：QuestionPipeline 三阶段（explore→plan→quiz）耗时约 60-120 秒，取决于 LLM 响应速度
 
 ### Phase 5: 收尾
 

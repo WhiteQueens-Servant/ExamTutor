@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Target } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ExamMasteryTable } from "@/components/exam-sprint/ExamMasteryTable";
@@ -12,22 +12,46 @@ import {
   MOCK_META,
   MOCK_MASTERY,
   MOCK_TASKS,
-  MOCK_QUIZ_QUESTIONS,
 } from "@/components/exam-sprint/types";
 import type { SprintTask } from "@/components/exam-sprint/types";
+import type { QuizQuestion } from "@/lib/quiz-types";
+import { generateExamQuestions } from "@/lib/exam-sprint-api";
 
 export default function ExamSprintPage() {
   const { t } = useTranslation();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerTitle, setDrawerTitle] = useState("");
+  const [drawerQuestions, setDrawerQuestions] = useState<QuizQuestion[]>([]);
+  const [drawerLoading, setDrawerLoading] = useState(false);
+  const [drawerError, setDrawerError] = useState<string | null>(null);
 
-  const handleTaskAction = (task: SprintTask, action: "learn" | "practice") => {
-    if (action === "practice") {
-      setDrawerTitle(`${task.knowledge_point} — ${t("Practice")}`);
-      setDrawerOpen(true);
-    }
-    // "learn" action will be wired in Phase 4 (RAG + Markdown)
-  };
+  const handleTaskAction = useCallback(
+    async (task: SprintTask, action: "learn" | "practice") => {
+      if (action === "practice") {
+        setDrawerTitle(`${task.knowledge_point} — ${t("Practice")}`);
+        setDrawerQuestions([]);
+        setDrawerError(null);
+        setDrawerLoading(true);
+        setDrawerOpen(true);
+
+        try {
+          const questions = await generateExamQuestions({
+            topic: task.knowledge_point,
+            num_questions: 3,
+            language: "zh",
+          });
+          setDrawerQuestions(questions);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setDrawerError(msg);
+        } finally {
+          setDrawerLoading(false);
+        }
+      }
+      // "learn" action will be wired in Phase 4 (RAG + Markdown)
+    },
+    [t],
+  );
 
   return (
     <div className="flex h-full min-h-full flex-col overflow-hidden bg-[var(--background)]">
@@ -65,8 +89,10 @@ export default function ExamSprintPage() {
       <QuizDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        questions={MOCK_QUIZ_QUESTIONS}
+        questions={drawerQuestions}
         title={drawerTitle}
+        loading={drawerLoading}
+        error={drawerError}
       />
     </div>
   );

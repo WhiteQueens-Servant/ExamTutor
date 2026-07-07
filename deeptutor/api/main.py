@@ -272,6 +272,7 @@ from deeptutor.api.routers import (
     chat,
     co_writer,
     dashboard,
+    exam_sprint,
     knowledge,
     memory,
     notebook,
@@ -364,6 +365,10 @@ app.include_router(
     prefix="/api/attachments",
     tags=["attachments"],
     dependencies=_auth,
+)
+
+app.include_router(
+    exam_sprint.router, prefix="/api/v1/exam-sprint", tags=["exam-sprint"], dependencies=_auth
 )
 
 # Unified WebSocket endpoint — auth is checked inside the handler (WebSockets
