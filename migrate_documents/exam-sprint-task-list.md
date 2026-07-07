@@ -82,7 +82,7 @@
 
 ### Phase 4: 后端真实逻辑接入
 
-- [ ] **4.1 纯规则工具**
+- [x] **4.1 纯规则工具**
   - TimePressureTool / WeakPointRankerTool / PlanBuilderTool
   - 零 token 消耗，pytest 验证
 
@@ -104,7 +104,10 @@
 - [ ] ⬆ **[点停] 浏览器验证**：端到端流程跑通（冷启动 → 任务执行 → 分数更新）
 
 #### 变更记录
-（执行中遇到的问题和修改记录在此）
+- 新建 `deeptutor/exam/tools.py`（3 个纯规则工具：TimePressureTool / WeakPointRankerTool / PlanBuilderTool）
+- 新建 `tests/exam/__init__.py`
+- 新建 `tests/exam/test_tools.py`（12 个测试用例，全部通过）
+- 问题：IEEE 754 浮点精度 — `0.9 - 0.8 = 0.09999...` 导致 gap=0.1 的优先级判定为 "low"。修复：在 `_rank_weak_points` 中先 `round(gap, 3)` 再传入 `_priority_from_gap`
 
 ### Phase 5: 收尾
 
