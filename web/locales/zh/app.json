@@ -2089,5 +2089,13 @@
   "No knowledge base (LLM only)": "无知识库（仅 LLM）",
   "AI Generated": "AI 生成",
   "Generating learning material...": "正在生成学习材料...",
-  "No content available": "暂无内容"
+  "No content available": "暂无内容",
+  "Welcome to Exam Sprint": "欢迎使用考试冲刺",
+  "Set up your exam to start your study plan": "设置考试信息，开始制定学习计划",
+  "Exam Name": "考试名称",
+  "e.g. Signal & Systems Final Exam": "例如：信号与系统 期末考试",
+  "Exam Date": "考试日期",
+  "Daily Study Budget (minutes)": "每日学习时长（分钟）",
+  "Setting up...": "正在设置...",
+  "Start Sprint": "开始冲刺"
 }

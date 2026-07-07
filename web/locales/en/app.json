@@ -2089,5 +2089,13 @@
   "No knowledge base (LLM only)": "No knowledge base (LLM only)",
   "AI Generated": "AI Generated",
   "Generating learning material...": "Generating learning material...",
-  "No content available": "No content available"
+  "No content available": "No content available",
+  "Welcome to Exam Sprint": "Welcome to Exam Sprint",
+  "Set up your exam to start your study plan": "Set up your exam to start your study plan",
+  "Exam Name": "Exam Name",
+  "e.g. Signal & Systems Final Exam": "e.g. Signal & Systems Final Exam",
+  "Exam Date": "Exam Date",
+  "Daily Study Budget (minutes)": "Daily Study Budget (minutes)",
+  "Setting up...": "Setting up...",
+  "Start Sprint": "Start Sprint"
 }

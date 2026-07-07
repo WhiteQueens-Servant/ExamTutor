@@ -1,21 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Database, Target } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ExamMasteryTable } from "@/components/exam-sprint/ExamMasteryTable";
 import { LearnDrawer } from "@/components/exam-sprint/LearnDrawer";
 import { QuizDrawer } from "@/components/exam-sprint/QuizDrawer";
+import { SetupModal } from "@/components/exam-sprint/SetupModal";
 import { SprintTaskList } from "@/components/exam-sprint/SprintTaskList";
 import { StatCards } from "@/components/exam-sprint/StatCards";
 import { TopWeakBanner } from "@/components/exam-sprint/TopWeakBanner";
 import {
-  MOCK_META,
   MOCK_TASKS,
 } from "@/components/exam-sprint/types";
 import type { MasteryEntry, SprintTask } from "@/components/exam-sprint/types";
 import type { QuizQuestion } from "@/lib/quiz-types";
-import { generateExamQuestions, generateLearnContent } from "@/lib/exam-sprint-api";
+import {
+  fetchExamState,
+  saveExamState,
+  generateExamQuestions,
+  generateLearnContent,
+  type ExamState,
+} from "@/lib/exam-sprint-api";
 import { fetchMastery } from "@/lib/exam-sprint-mastery-api";
 import { useKnowledgeBases } from "@/hooks/useKnowledgeBases";
 
@@ -24,6 +30,10 @@ export default function ExamSprintPage() {
   const { kbs, loading: kbLoading } = useKnowledgeBases();
   const [selectedKb, setSelectedKb] = useState("");
   const [mastery, setMastery] = useState<MasteryEntry[]>([]);
+  const [examState, setExamState] = useState<ExamState | null>(null);
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [setupError, setSetupError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerTitle, setDrawerTitle] = useState("");
   const [drawerQuestions, setDrawerQuestions] = useState<QuizQuestion[]>([]);
@@ -38,14 +48,76 @@ export default function ExamSprintPage() {
   const [learnLoading, setLearnLoading] = useState(false);
   const [learnError, setLearnError] = useState<string | null>(null);
 
-  // Fetch mastery on mount
+  // Fetch exam state + mastery on mount
   useEffect(() => {
+    fetchExamState()
+      .then((state) => {
+        setExamState(state);
+        // Cold start: no exam name configured
+        if (!state.exam_name || !state.exam_date) {
+          setSetupOpen(true);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load exam state:", err);
+        setSetupOpen(true); // Show setup on error
+      });
+
     fetchMastery()
       .then(setMastery)
       .catch((err) => {
         console.error("Failed to load mastery:", err);
-        // Fall back to empty list — dashboard still renders
       });
+  }, []);
+
+  // Compute meta from exam state (fallback to MOCK_META)
+  const meta = useMemo(() => {
+    if (!examState || !examState.exam_name) {
+      return {
+        exam_name: "Loading...",
+        exam_date: "",
+        days_remaining: 0,
+        phase: "phase_planning" as const,
+        streak: 0,
+        total_tasks_today: 0,
+        completed_tasks_today: 0,
+      };
+    }
+    const examDate = new Date(examState.exam_date);
+    const now = new Date();
+    const daysRemaining = Math.max(0, Math.ceil((examDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+    let phase: "phase_planning" | "sprint_week" | "score_protection" = "phase_planning";
+    if (daysRemaining <= 3) phase = "score_protection";
+    else if (daysRemaining <= 13) phase = "sprint_week";
+    return {
+      exam_name: examState.exam_name,
+      exam_date: examState.exam_date,
+      days_remaining: daysRemaining,
+      phase,
+      streak: examState.streak,
+      total_tasks_today: examState.total_tasks_today,
+      completed_tasks_today: examState.completed_tasks_today,
+    };
+  }, [examState]);
+
+  // Setup handler
+  const handleSetup = useCallback(async (data: {
+    exam_name: string;
+    exam_date: string;
+    daily_budget_minutes: number;
+  }) => {
+    setSetupLoading(true);
+    setSetupError(null);
+    try {
+      const state = await saveExamState(data);
+      setExamState(state);
+      setSetupOpen(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setSetupError(msg);
+    } finally {
+      setSetupLoading(false);
+    }
   }, []);
 
   const handleTaskAction = useCallback(
@@ -110,7 +182,7 @@ export default function ExamSprintPage() {
               {t("Exam Sprint")}
             </div>
             <div className="text-xs text-[var(--muted-foreground)]">
-              {MOCK_META.exam_name}
+              {meta.exam_name}
             </div>
           </div>
         </div>
@@ -141,7 +213,7 @@ export default function ExamSprintPage() {
           <TopWeakBanner data={mastery} />
 
           {/* Stat cards */}
-          <StatCards meta={MOCK_META} />
+          <StatCards meta={meta} />
 
           {/* Task list */}
           <SprintTaskList tasks={MOCK_TASKS} onAction={handleTaskAction} />
@@ -170,6 +242,14 @@ export default function ExamSprintPage() {
         source={learnSource}
         loading={learnLoading}
         error={learnError}
+      />
+
+      {/* Setup modal (cold start) */}
+      <SetupModal
+        open={setupOpen}
+        onSubmit={handleSetup}
+        loading={setupLoading}
+        error={setupError}
       />
     </div>
   );

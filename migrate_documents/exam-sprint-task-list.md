@@ -159,7 +159,7 @@
 
 ### Phase 5: 收尾
 
-- [ ] **5.1 冷启动流程**
+- [x] **5.1 冷启动流程**
   - 首次使用引导（选科目 → 设考试日期 → RAG 入库 → 初始化 mastery）
 
 - [ ] **5.2 阶段自动切换（lazy hook）**
@@ -177,6 +177,17 @@
 - [ ] ⬆ **[点停] 最终验证**：完整用户旅程浏览器跑一遍
 
 #### 变更记录
+
+##### Phase 5.1
+- 新建 `deeptutor/exam/state.py`（考试状态存储模块：load_state / save_state / is_cold_start / update_state）
+- 修改 `deeptutor/api/routers/exam_sprint.py`（新增 GET /state + POST /state 端点）
+- 修改 `web/lib/exam-sprint-api.ts`（新增 fetchExamState / saveExamState API）
+- 新建 `web/components/exam-sprint/SetupModal.tsx`（冷启动引导表单组件）
+- 修改 `web/app/(workspace)/exam-sprint/page.tsx`（集成 SetupModal，替换 MOCK_META 为真实 exam state，自动计算 phase/days_remaining）
+- 修改 `web/locales/en/app.json` + `web/locales/zh/app.json`（新增 Setup 相关 i18n key）
+- 验证：浏览器端到端流程跑通 — 首次访问弹出 SetupModal → 填写考试信息 → 提交 → Dashboard 显示真实考试名称和剩余天数
+- 注意：V0 冷启动仅收集考试信息，诊断评估和能力画像留待后续迭代
+
 （执行中遇到的问题和修改记录在此）
 
 ---

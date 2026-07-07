@@ -130,6 +130,37 @@ async def generate_questions(req: GenerateQuestionsRequest) -> list[dict[str, An
 
 
 # ---------------------------------------------------------------------------
+# Exam state endpoints (cold start)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/state")
+async def get_state() -> dict[str, Any]:
+    """Return the current exam state (name, date, phase, etc.)."""
+    from deeptutor.exam.state import load_state
+
+    return load_state()
+
+
+class ExamStateRequest(BaseModel):
+    exam_name: str = Field(..., min_length=1, description="Exam name (e.g. '信号与系统 期末考试')")
+    exam_date: str = Field(..., description="Exam date in YYYY-MM-DD format")
+    daily_budget_minutes: int = Field(120, ge=10, le=480, description="Daily study budget in minutes")
+
+
+@router.post("/state")
+async def save_exam_state(req: ExamStateRequest) -> dict[str, Any]:
+    """Save exam state (cold start setup)."""
+    from deeptutor.exam.state import update_state
+
+    return update_state(
+        exam_name=req.exam_name,
+        exam_date=req.exam_date,
+        daily_budget_minutes=req.daily_budget_minutes,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Mastery endpoints
 # ---------------------------------------------------------------------------
 

@@ -43,6 +43,57 @@ export async function generateExamQuestions(
 }
 
 // ---------------------------------------------------------------------------
+// Exam state (cold start)
+// ---------------------------------------------------------------------------
+
+export interface ExamState {
+  exam_name: string;
+  exam_date: string;
+  phase: string;
+  streak: number;
+  last_active: string;
+  daily_budget_minutes: number;
+  total_tasks_today: number;
+  completed_tasks_today: number;
+}
+
+/**
+ * Fetch the current exam state.
+ */
+export async function fetchExamState(): Promise<ExamState> {
+  const res = await apiFetch(apiUrl("/api/v1/exam-sprint/state"));
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`Failed to fetch exam state (${res.status}): ${detail}`);
+  }
+  return await res.json();
+}
+
+/**
+ * Save exam state (cold start setup).
+ */
+export async function saveExamState(params: {
+  exam_name: string;
+  exam_date: string;
+  daily_budget_minutes?: number;
+}): Promise<ExamState> {
+  const res = await apiFetch(apiUrl("/api/v1/exam-sprint/state"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      exam_name: params.exam_name,
+      exam_date: params.exam_date,
+      daily_budget_minutes: params.daily_budget_minutes ?? 120,
+    }),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`Failed to save exam state (${res.status}): ${detail}`);
+  }
+  return await res.json();
+}
+
+// ---------------------------------------------------------------------------
 // Learn content generation
 // ---------------------------------------------------------------------------
 
