@@ -2086,5 +2086,8 @@
   "L1 · raw trace": "L1 · 原始事件",
   "Click to lock · open in workbench": "点击锁定 · 在工作台中打开",
   "Hover a node to preview the memory. Click to lock the highlight and trace its references inward (L1 → L2 → L3) or outward.": "悬停节点可预览记忆。点击可锁定高亮，并追踪其向内（L1 → L2 → L3）或向外的引用关系。",
-  "No knowledge base (LLM only)": "无知识库（仅 LLM）"
+  "No knowledge base (LLM only)": "无知识库（仅 LLM）",
+  "AI Generated": "AI 生成",
+  "Generating learning material...": "正在生成学习材料...",
+  "No content available": "暂无内容"
 }

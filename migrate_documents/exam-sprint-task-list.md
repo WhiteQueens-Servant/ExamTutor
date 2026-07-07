@@ -136,6 +136,27 @@
 - 验证：浏览器端到端流程跑通 — 页面加载时自动拉取掌握度，TopWeakBanner 正确显示最弱知识点，MasteryOverview 显示全部知识点进度
 - 注意：掌握度存储在 `data/exam_sprint/mastery.json`，不依赖 L2 记忆系统（L2 是 markdown 文档，不适合结构化分数）
 
+### Phase 4.5: Learn 链路
+
+- [x] **4.5 Learn 学习材料生成**
+  - 后端：`POST /api/v1/exam-sprint/learn` 端点
+  - Prompt 工程：注入 Stage 约束 + 记忆对象（mastery/ability_profile）+ RAG 结果 → LLM 生成学习材料
+  - RAG 检索（有 KB 时）→ LLM 整理 → Markdown 输出；RAG 失败/无 KB → fallback 到 LLM 直接生成
+  - 前端：`LearnDrawer.tsx` 组件（MarkdownRenderer 渲染学习材料）
+  - 前端：Learn 按钮绑定事件，打开 Drawer 展示学习内容
+  - 与 Practice 对称：Learn 生成"学什么"，Practice 生成"练什么"
+
+- [x] ⬆ **[点停] 浏览器验证**：Learn 按钮点击 → Drawer 打开 → 学习材料正确渲染
+
+##### Phase 4.5
+- 修改 `deeptutor/api/routers/exam_sprint.py`（新增 POST /learn 端点：mastery 读取 + RAG 检索 + Prompt 工程 + LLM 生成）
+- 修改 `web/lib/exam-sprint-api.ts`（新增 generateLearnContent API）
+- 新建 `web/components/exam-sprint/LearnDrawer.tsx`（Markdown 阅读面板组件）
+- 修改 `web/app/(workspace)/exam-sprint/page.tsx`（Learn 按钮绑定事件，LearnDrawer 集成）
+- 修改 `web/locales/en/app.json` + `web/locales/zh/app.json`（新增 Learn 相关 i18n key）
+- 验证：浏览器端到端流程跑通 — 点击 Learn → Drawer 打开 → loading → LLM 生成学习材料 → Markdown + LaTeX 正确渲染
+- 注意：LLM 生成耗时约 60-120 秒，内容包含概念解释、核心公式、典型例题、要点总结
+
 ### Phase 5: 收尾
 
 - [ ] **5.1 冷启动流程**

@@ -161,3 +161,108 @@ async def update_mastery(req: MasteryUpdateRequest) -> list[dict[str, Any]]:
         new_score=req.score,
         surface=req.surface,
     )
+
+
+# ---------------------------------------------------------------------------
+# Learn endpoint — generate learning material for a knowledge point
+# ---------------------------------------------------------------------------
+
+
+class LearnRequest(BaseModel):
+    knowledge_point: str = Field(..., min_length=1, description="Knowledge point to learn")
+    kb_name: str = Field("", description="Knowledge base name for RAG retrieval. Empty = LLM only.")
+    language: str = Field("zh", description="Language code")
+
+
+@router.post("/learn")
+async def generate_learn_content(req: LearnRequest) -> dict[str, Any]:
+    """Generate learning material for a knowledge point.
+
+    Pipeline:
+    1. Read mastery score for context
+    2. RAG search (if kb_name provided) for reference material
+    3. LLM generates stage-aware, mastery-calibrated learning content
+    4. Returns Markdown content + source info
+    """
+    from deeptutor.exam.mastery import load_mastery
+    from deeptutor.services.llm import get_llm_client
+
+    # 1. Read mastery for this knowledge point
+    mastery_entries = load_mastery()
+    mastery_score = 0.5  # default
+    for entry in mastery_entries:
+        if entry.get("knowledge_point") == req.knowledge_point:
+            mastery_score = entry.get("score", 0.5)
+            break
+
+    # 2. RAG search for reference material
+    rag_context = ""
+    source = "llm"
+    if req.kb_name.strip():
+        try:
+            from deeptutor.multi_user.knowledge_access import resolve_for_rag
+            from deeptutor.services.rag.service import RAGService
+
+            resource = resolve_for_rag(req.kb_name)
+            if resource is not None:
+                rag_service = RAGService(kb_base_dir=str(resource.base_dir))
+                rag_result = await rag_service.search(
+                    query=req.knowledge_point,
+                    kb_name=resource.name,
+                )
+                answer = rag_result.get("answer") or rag_result.get("content") or ""
+                if answer:
+                    rag_context = answer
+                    source = "rag"
+                    logger.info("RAG retrieved %d chars for learn: %s", len(answer), req.knowledge_point)
+        except Exception as exc:
+            logger.warning("RAG search failed for learn kb=%s: %s — using LLM only", req.kb_name, exc)
+
+    # 3. Build prompt with stage/mastery context
+    if mastery_score < 0.3:
+        depth_instruction = "从基础概念讲起，详细解释定义和原理，配合简单例题。"
+    elif mastery_score < 0.5:
+        depth_instruction = "侧重概念理解和核心公式推导，配合中等难度例题。"
+    elif mastery_score < 0.7:
+        depth_instruction = "侧重进阶应用和易错点辨析，配合综合例题。"
+    else:
+        depth_instruction = "简要回顾核心要点，侧重高频考点和易混淆概念。"
+
+    system_prompt = (
+        "你是一位经验丰富的备考辅导老师。"
+        "请用 Markdown 格式生成学习材料，支持 LaTeX 数学公式（用 $...$ 包裹）。"
+        "内容结构：概念解释 → 核心公式 → 典型例题 → 要点总结。"
+    )
+
+    user_prompt = f"请为学生生成「{req.knowledge_point}」的学习材料。\n\n"
+    user_prompt += f"【学生掌握度】{mastery_score:.0%}\n"
+    user_prompt += f"【讲解深度】{depth_instruction}\n\n"
+
+    if rag_context:
+        user_prompt += f"【参考材料】（来自知识库）\n{rag_context}\n\n"
+        user_prompt += "请基于以上参考材料，为学生整理学习内容。如果参考材料不足，可补充通用知识。\n"
+    else:
+        user_prompt += "无知识库参考，请基于通用知识生成学习材料。\n"
+
+    user_prompt += "\n输出纯 Markdown，包含公式和例题。"
+
+    # 4. Call LLM
+    llm = get_llm_client()
+    try:
+        content = await llm.complete(
+            prompt=user_prompt,
+            system_prompt=system_prompt,
+        )
+    except Exception as exc:
+        logger.exception("LLM failed for learn: %s", req.knowledge_point)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Learn generation failed: {type(exc).__name__}: {exc}",
+        )
+
+    return {
+        "knowledge_point": req.knowledge_point,
+        "content": content,
+        "source": source,
+        "mastery_score": mastery_score,
+    }

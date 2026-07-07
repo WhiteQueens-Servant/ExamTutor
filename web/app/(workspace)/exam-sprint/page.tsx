@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Database, Target } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ExamMasteryTable } from "@/components/exam-sprint/ExamMasteryTable";
+import { LearnDrawer } from "@/components/exam-sprint/LearnDrawer";
 import { QuizDrawer } from "@/components/exam-sprint/QuizDrawer";
 import { SprintTaskList } from "@/components/exam-sprint/SprintTaskList";
 import { StatCards } from "@/components/exam-sprint/StatCards";
@@ -14,7 +15,7 @@ import {
 } from "@/components/exam-sprint/types";
 import type { MasteryEntry, SprintTask } from "@/components/exam-sprint/types";
 import type { QuizQuestion } from "@/lib/quiz-types";
-import { generateExamQuestions } from "@/lib/exam-sprint-api";
+import { generateExamQuestions, generateLearnContent } from "@/lib/exam-sprint-api";
 import { fetchMastery } from "@/lib/exam-sprint-mastery-api";
 import { useKnowledgeBases } from "@/hooks/useKnowledgeBases";
 
@@ -28,6 +29,14 @@ export default function ExamSprintPage() {
   const [drawerQuestions, setDrawerQuestions] = useState<QuizQuestion[]>([]);
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [drawerError, setDrawerError] = useState<string | null>(null);
+
+  // Learn drawer state
+  const [learnOpen, setLearnOpen] = useState(false);
+  const [learnTitle, setLearnTitle] = useState("");
+  const [learnContent, setLearnContent] = useState("");
+  const [learnSource, setLearnSource] = useState<"rag" | "llm" | "">("");
+  const [learnLoading, setLearnLoading] = useState(false);
+  const [learnError, setLearnError] = useState<string | null>(null);
 
   // Fetch mastery on mount
   useEffect(() => {
@@ -63,7 +72,30 @@ export default function ExamSprintPage() {
           setDrawerLoading(false);
         }
       }
-      // "learn" action will be wired in Phase 4 (RAG + Markdown)
+
+      if (action === "learn") {
+        setLearnTitle(`${task.knowledge_point} — ${t("Learn")}`);
+        setLearnContent("");
+        setLearnSource("");
+        setLearnError(null);
+        setLearnLoading(true);
+        setLearnOpen(true);
+
+        try {
+          const result = await generateLearnContent({
+            knowledge_point: task.knowledge_point,
+            kb_name: selectedKb,
+            language: "zh",
+          });
+          setLearnContent(result.content);
+          setLearnSource(result.source);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setLearnError(msg);
+        } finally {
+          setLearnLoading(false);
+        }
+      }
     },
     [t, selectedKb],
   );
@@ -127,6 +159,17 @@ export default function ExamSprintPage() {
         title={drawerTitle}
         loading={drawerLoading}
         error={drawerError}
+      />
+
+      {/* Learn drawer */}
+      <LearnDrawer
+        open={learnOpen}
+        onClose={() => setLearnOpen(false)}
+        title={learnTitle}
+        content={learnContent}
+        source={learnSource}
+        loading={learnLoading}
+        error={learnError}
       />
     </div>
   );
