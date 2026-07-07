@@ -21,6 +21,7 @@ import {
   generateExamQuestions,
   generateLearnContent,
   type ExamState,
+  type DiagnosisSubmitResult,
 } from "@/lib/exam-sprint-api";
 import { fetchMastery } from "@/lib/exam-sprint-mastery-api";
 import { useKnowledgeBases } from "@/hooks/useKnowledgeBases";
@@ -53,8 +54,8 @@ export default function ExamSprintPage() {
     fetchExamState()
       .then((state) => {
         setExamState(state);
-        // Cold start: no exam name configured
-        if (!state.exam_name || !state.exam_date) {
+        // Cold start: onboarding not completed or no exam info
+        if (!state.onboarding_completed || !state.exam_name || !state.exam_date) {
           setSetupOpen(true);
         }
       })
@@ -105,12 +106,31 @@ export default function ExamSprintPage() {
     exam_name: string;
     exam_date: string;
     daily_budget_minutes: number;
+    kb_name: string;
+    diagnosis: DiagnosisSubmitResult | null;
   }) => {
     setSetupLoading(true);
     setSetupError(null);
     try {
-      const state = await saveExamState(data);
+      const state = await saveExamState({
+        exam_name: data.exam_name,
+        exam_date: data.exam_date,
+        daily_budget_minutes: data.daily_budget_minutes,
+        onboarding_completed: true,
+        diagnosis_completed: data.diagnosis !== null,
+        kb_name: data.kb_name,
+      });
       setExamState(state);
+      // Update mastery from diagnosis results
+      if (data.diagnosis && data.diagnosis.knowledge_points) {
+        setMastery(
+          data.diagnosis.knowledge_points.map((kp) => ({
+            knowledge_point: kp.name,
+            score: kp.score,
+            surface: "diagnosis",
+          })),
+        );
+      }
       setSetupOpen(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -247,7 +267,7 @@ export default function ExamSprintPage() {
       {/* Setup modal (cold start) */}
       <SetupModal
         open={setupOpen}
-        onSubmit={handleSetup}
+        onComplete={handleSetup}
         loading={setupLoading}
         error={setupError}
       />

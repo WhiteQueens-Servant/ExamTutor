@@ -9,7 +9,7 @@ import type { QuizQuestion } from "@/lib/quiz-types";
 export interface MasteryEntry {
   knowledge_point: string;
   score: number; // 0.0 - 1.0
-  surface: "notebook" | "quiz" | "chat" | "kb" | "book";
+  surface: "notebook" | "quiz" | "chat" | "kb" | "book" | "diagnosis";
 }
 
 export interface SprintTask {

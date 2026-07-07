@@ -30,6 +30,7 @@ const SURFACE_LABELS: Record<string, string> = {
   chat: "Chat",
   kb: "KB",
   book: "Book",
+  diagnosis: "Diagnosis",
 };
 
 export function ExamMasteryTable({ data }: { data: MasteryEntry[] }) {

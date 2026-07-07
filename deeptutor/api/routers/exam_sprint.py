@@ -310,6 +310,181 @@ async def generate_learn_content(req: LearnRequest) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Diagnosis endpoints — initial assessment during cold start
+# ---------------------------------------------------------------------------
+
+
+class DiagnosisGenerateRequest(BaseModel):
+    exam_name: str = Field(..., min_length=1, description="Exam name for context")
+    kb_name: str = Field("", description="Knowledge base name for RAG-scoped generation")
+    language: str = Field("zh", description="Language code")
+
+
+@router.post("/diagnosis/generate")
+async def generate_diagnosis(req: DiagnosisGenerateRequest) -> list[dict[str, Any]]:
+    """Generate diagnostic assessment questions.
+
+    The LLM determines the number of questions dynamically based on
+    the exam scope and KB content. Returns a list of QuizQuestion objects.
+    """
+    from deeptutor.agents.question.pipeline import QuestionPipeline
+    from deeptutor.agents.question.request_config import build_question_runtime_config
+    from deeptutor.core.context import UnifiedContext
+    from deeptutor.core.stream_bus import StreamBus
+    from deeptutor.services.config import load_config_with_main
+
+    session_id = str(uuid.uuid4())
+
+    # RAG context for diagnosis
+    rag_context = ""
+    if req.kb_name.strip():
+        try:
+            from deeptutor.multi_user.knowledge_access import resolve_for_rag
+            from deeptutor.services.rag.service import RAGService
+
+            resource = resolve_for_rag(req.kb_name)
+            if resource is not None:
+                rag_service = RAGService(kb_base_dir=str(resource.base_dir))
+                rag_result = await rag_service.search(
+                    query=f"{req.exam_name} 核心知识点诊断",
+                    kb_name=resource.name,
+                )
+                answer = rag_result.get("answer") or rag_result.get("content") or ""
+                if answer:
+                    rag_context = f"\n\nRelevant knowledge base context:\n{answer}"
+        except Exception as exc:
+            logger.warning("RAG search failed for diagnosis kb=%s: %s", req.kb_name, exc)
+
+    user_message = (
+        f"Please generate a diagnostic assessment for the exam: {req.exam_name}. "
+        f"Create questions that cover the core knowledge points across all major chapters/topics. "
+        f"The goal is to assess the student's current understanding level. "
+        f"Generate an appropriate number of questions (typically 10-15) to cover the key areas. "
+        f"Include a mix of difficulty levels. "
+        f"For each question, include the knowledge_point field indicating which topic it tests."
+        f"{rag_context}"
+    )
+
+    context = UnifiedContext(
+        session_id=session_id,
+        user_message=user_message,
+        active_capability="exam_sprint",
+        language=req.language,
+    )
+
+    runtime_config = build_question_runtime_config(
+        base_config=load_config_with_main("main.yaml"),
+    )
+
+    pipeline = QuestionPipeline(
+        language=req.language,
+        runtime_config=runtime_config,
+    )
+
+    stream = StreamBus()
+
+    try:
+        result_payload = await pipeline.run(
+            context=context,
+            user_message=user_message,
+            num_questions=15,  # hint, LLM may generate more/fewer
+            difficulty="auto",
+            stream=stream,
+        )
+    except Exception as exc:
+        logger.exception("QuestionPipeline failed for diagnosis: %s", exc)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Diagnosis generation failed: {type(exc).__name__}: {exc}",
+        )
+
+    summary = result_payload.get("summary", {}) if isinstance(result_payload, dict) else {}
+    results = summary.get("results", []) if isinstance(summary, dict) else []
+
+    questions: list[dict[str, Any]] = []
+    for item in results:
+        qa_pair = item.get("qa_pair") if isinstance(item, dict) else None
+        if not qa_pair or not isinstance(qa_pair, dict):
+            continue
+        questions.append({
+            "question_id": qa_pair.get("question_id", ""),
+            "question": qa_pair.get("question", ""),
+            "question_type": qa_pair.get("question_type", "short_answer"),
+            "options": qa_pair.get("options"),
+            "correct_answer": qa_pair.get("correct_answer", ""),
+            "explanation": qa_pair.get("explanation", ""),
+            "difficulty": qa_pair.get("difficulty", ""),
+            "knowledge_point": qa_pair.get("concentration", qa_pair.get("knowledge_point", "")),
+        })
+
+    if not questions:
+        raise HTTPException(
+            status_code=502,
+            detail="Diagnosis pipeline returned no questions. Check LLM configuration.",
+        )
+
+    return questions
+
+
+class DiagnosisSubmitRequest(BaseModel):
+    exam_name: str = Field(..., min_length=1, description="Exam name")
+    answers: list[dict[str, Any]] = Field(..., description="List of answer records")
+    # Each answer: {question_id, question, correct_answer, user_answer, is_correct, error_type, knowledge_point}
+
+
+@router.post("/diagnosis/submit")
+async def submit_diagnosis(req: DiagnosisSubmitRequest) -> dict[str, Any]:
+    """Submit diagnosis answers and initialize the user profile.
+
+    Aggregates results by knowledge point, calculates initial scores,
+    and writes to profile.json (first-time initialization, not EMA).
+    """
+    from deeptutor.exam.profile import init_from_diagnosis
+
+    # Calculate overall score
+    total = len(req.answers)
+    correct = sum(1 for a in req.answers if a.get("is_correct"))
+    overall_score = round(correct / total, 3) if total > 0 else 0.0
+
+    # Sort knowledge points by score to find weak/strong
+    kp_scores: dict[str, list[bool]] = {}
+    for a in req.answers:
+        kp = a.get("knowledge_point", "unknown")
+        if kp not in kp_scores:
+            kp_scores[kp] = []
+        kp_scores[kp].append(a.get("is_correct", False))
+
+    kp_avg = {kp: sum(v) / len(v) for kp, v in kp_scores.items() if v}
+    weak_points = [kp for kp, avg in sorted(kp_avg.items(), key=lambda x: x[1]) if avg < 0.6]
+    strong_points = [kp for kp, avg in sorted(kp_avg.items(), key=lambda x: -x[1]) if avg >= 0.8]
+
+    diagnosis_result = {
+        "total_questions": total,
+        "questions": req.answers,
+        "overall_score": overall_score,
+        "weak_points": weak_points,
+        "strong_points": strong_points,
+    }
+
+    profile = init_from_diagnosis(req.exam_name, diagnosis_result)
+
+    return {
+        "status": "ok",
+        "overall_score": overall_score,
+        "total_questions": total,
+        "correct": correct,
+        "weak_points": weak_points,
+        "strong_points": strong_points,
+        "knowledge_points": profile.get("knowledge_points", []),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Profile endpoint — full user profile (system + user facing)
+# ---------------------------------------------------------------------------
+
+
 @router.get("/profile")
 async def get_profile() -> dict[str, Any]:
     """Return the full user profile (knowledge_points + diagnosis)."""

@@ -213,3 +213,72 @@ export async function resetExamState(): Promise<void> {
     throw new Error(`Failed to reset state (${res.status}): ${detail}`);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Diagnosis (cold start assessment)
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate diagnostic assessment questions.
+ * LLM determines question count dynamically based on exam scope.
+ */
+export async function generateDiagnosis(params: {
+  exam_name: string;
+  kb_name?: string;
+  language?: string;
+}): Promise<QuizQuestion[]> {
+  const res = await apiFetch(apiUrl("/api/v1/exam-sprint/diagnosis/generate"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      exam_name: params.exam_name,
+      kb_name: params.kb_name ?? "",
+      language: params.language ?? "zh",
+    }),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`Diagnosis generation failed (${res.status}): ${detail}`);
+  }
+  return await res.json();
+}
+
+export interface DiagnosisSubmitResult {
+  status: string;
+  overall_score: number;
+  total_questions: number;
+  correct: number;
+  weak_points: string[];
+  strong_points: string[];
+  knowledge_points: KnowledgePoint[];
+}
+
+/**
+ * Submit diagnosis answers and initialize the user profile.
+ */
+export async function submitDiagnosis(params: {
+  exam_name: string;
+  answers: Array<{
+    question_id: string;
+    question: string;
+    correct_answer: string;
+    user_answer: string;
+    is_correct: boolean;
+    error_type: string;
+    knowledge_point: string;
+  }>;
+}): Promise<DiagnosisSubmitResult> {
+  const res = await apiFetch(apiUrl("/api/v1/exam-sprint/diagnosis/submit"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      exam_name: params.exam_name,
+      answers: params.answers,
+    }),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`Diagnosis submit failed (${res.status}): ${detail}`);
+  }
+  return await res.json();
+}
