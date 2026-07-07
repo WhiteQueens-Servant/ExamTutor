@@ -91,13 +91,13 @@
   - 前端 QuizDrawer 接入真实 API，显示 loading/error 状态
   - Practice 按钮触发真实题目生成，QuizPreview 渲染 + 答题交互正常
 
-- [ ] **4.3 RAG + LLM 降级 + 知识库选择器**
+- [x] **4.3 RAG + LLM 降级 + 知识库选择器**
   - 后端：ExamSprintCapability 接收 `kb_name` 参数，调用 `rag_service.search(query, kb_name)` 做精确范围检索
   - 后端：RAG 不可用时降级到 `llm.complete()` 直接生成
   - 前端：Dashboard 顶部增加知识库选择器（从已有 KB 列表选择，复用 `useKnowledgeBases` hook）
   - 注意：Phase 4 仅做选择器，上传功能放在 Phase 5
 
-- [ ] **4.4 掌握度读写**
+- [x] **4.4 掌握度读写**
   - Capability 内读 L2（old mastery）→ 计算 → 对比 → 写回
   - 前端替换 mock 数据为真实 mastery
 
@@ -119,6 +119,22 @@
 - 修改 `web/app/(workspace)/exam-sprint/page.tsx`（Practice 按钮接入真实 API）
 - 验证：浏览器端到端流程跑通 — 点击 Practice → loading → 真实 LLM 题目生成 → 答题 → 正确性判定 → 解析显示
 - 注意：QuestionPipeline 三阶段（explore→plan→quiz）耗时约 60-120 秒，取决于 LLM 响应速度
+
+##### Phase 4.3
+- 修改 `deeptutor/api/routers/exam_sprint.py`（新增 `kb_name` 字段，RAG 检索 + LLM 降级逻辑）
+- 修改 `web/lib/exam-sprint-api.ts`（`GenerateQuestionsParams` 新增 `kb_name`）
+- 修改 `web/app/(workspace)/exam-sprint/page.tsx`（引入 `useKnowledgeBases` hook，header 添加 KB 选择器）
+- 修改 `web/locales/en/app.json` + `web/locales/zh/app.json`（新增 "No knowledge base (LLM only)" i18n key）
+- 验证：TypeScript 编译通过，浏览器渲染正常，KB 选择器显示在 header 右侧
+- 注意：RAG 检索失败时自动降级为纯 LLM 生成，不影响原有流程
+
+##### Phase 4.4
+- 新建 `deeptutor/exam/mastery.py`（掌握度存储模块：load_mastery / save_mastery / update_mastery_score，指数移动平均混合）
+- 修改 `deeptutor/api/routers/exam_sprint.py`（新增 GET /mastery + POST /mastery/update 端点）
+- 新建 `web/lib/exam-sprint-mastery-api.ts`（前端掌握度 API 客户端）
+- 修改 `web/app/(workspace)/exam-sprint/page.tsx`（引入 fetchMastery，替换 MOCK_MASTERY 为真实数据）
+- 验证：浏览器端到端流程跑通 — 页面加载时自动拉取掌握度，TopWeakBanner 正确显示最弱知识点，MasteryOverview 显示全部知识点进度
+- 注意：掌握度存储在 `data/exam_sprint/mastery.json`，不依赖 L2 记忆系统（L2 是 markdown 文档，不适合结构化分数）
 
 ### Phase 5: 收尾
 

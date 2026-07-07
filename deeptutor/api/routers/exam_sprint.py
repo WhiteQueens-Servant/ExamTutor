@@ -127,3 +127,37 @@ async def generate_questions(req: GenerateQuestionsRequest) -> list[dict[str, An
         )
 
     return questions
+
+
+# ---------------------------------------------------------------------------
+# Mastery endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/mastery")
+async def get_mastery() -> list[dict[str, Any]]:
+    """Return all mastery entries for the Exam Sprint dashboard."""
+    from deeptutor.exam.mastery import load_mastery
+
+    return load_mastery()
+
+
+class MasteryUpdateRequest(BaseModel):
+    knowledge_point: str = Field(..., min_length=1, description="Knowledge point name")
+    score: float = Field(..., ge=0.0, le=1.0, description="New score (0.0-1.0)")
+    surface: str = Field("quiz", description="Source surface: notebook|quiz|chat|kb|book")
+
+
+@router.post("/mastery/update")
+async def update_mastery(req: MasteryUpdateRequest) -> list[dict[str, Any]]:
+    """Update a mastery entry (exponential moving average blend).
+
+    Returns the full updated mastery list.
+    """
+    from deeptutor.exam.mastery import update_mastery_score
+
+    return update_mastery_score(
+        knowledge_point=req.knowledge_point,
+        new_score=req.score,
+        surface=req.surface,
+    )

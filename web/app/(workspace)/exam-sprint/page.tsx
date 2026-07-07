@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Database, Target } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ExamMasteryTable } from "@/components/exam-sprint/ExamMasteryTable";
@@ -10,23 +10,34 @@ import { StatCards } from "@/components/exam-sprint/StatCards";
 import { TopWeakBanner } from "@/components/exam-sprint/TopWeakBanner";
 import {
   MOCK_META,
-  MOCK_MASTERY,
   MOCK_TASKS,
 } from "@/components/exam-sprint/types";
-import type { SprintTask } from "@/components/exam-sprint/types";
+import type { MasteryEntry, SprintTask } from "@/components/exam-sprint/types";
 import type { QuizQuestion } from "@/lib/quiz-types";
 import { generateExamQuestions } from "@/lib/exam-sprint-api";
+import { fetchMastery } from "@/lib/exam-sprint-mastery-api";
 import { useKnowledgeBases } from "@/hooks/useKnowledgeBases";
 
 export default function ExamSprintPage() {
   const { t } = useTranslation();
   const { kbs, loading: kbLoading } = useKnowledgeBases();
   const [selectedKb, setSelectedKb] = useState("");
+  const [mastery, setMastery] = useState<MasteryEntry[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerTitle, setDrawerTitle] = useState("");
   const [drawerQuestions, setDrawerQuestions] = useState<QuizQuestion[]>([]);
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [drawerError, setDrawerError] = useState<string | null>(null);
+
+  // Fetch mastery on mount
+  useEffect(() => {
+    fetchMastery()
+      .then(setMastery)
+      .catch((err) => {
+        console.error("Failed to load mastery:", err);
+        // Fall back to empty list — dashboard still renders
+      });
+  }, []);
 
   const handleTaskAction = useCallback(
     async (task: SprintTask, action: "learn" | "practice") => {
@@ -95,7 +106,7 @@ export default function ExamSprintPage() {
       <main className="flex-1 overflow-y-auto px-6 py-5">
         <div className="mx-auto flex max-w-4xl flex-col gap-5">
           {/* Time pressure banner */}
-          <TopWeakBanner data={MOCK_MASTERY} />
+          <TopWeakBanner data={mastery} />
 
           {/* Stat cards */}
           <StatCards meta={MOCK_META} />
@@ -104,7 +115,7 @@ export default function ExamSprintPage() {
           <SprintTaskList tasks={MOCK_TASKS} onAction={handleTaskAction} />
 
           {/* Mastery table */}
-          <ExamMasteryTable data={MOCK_MASTERY} />
+          <ExamMasteryTable data={mastery} />
         </div>
       </main>
 
