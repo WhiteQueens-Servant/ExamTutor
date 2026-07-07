@@ -33,32 +33,28 @@
 
 ### Phase 2: 后端 Capability 注册
 
-- [x] **2.1 注册空 Capability**
+- [ ] **2.1 注册空 Capability**
   - 创建 `deeptutor/capabilities/exam_sprint.py`（manifest only，run() 直接返回）
   - 注册到 `builtin_capabilities.py` 的 `BUILTIN_CAPABILITY_CLASSES`
 
-- [x] **2.2 ExamStream 包装**
+- [ ] **2.2 ExamStream 包装**
   - 复用 BookStream 模式，创建 `deeptutor/exam/streaming.py`
 
-- [x] ⬆ **[点停] 验证**：pytest 通过，前端 Console 无报错，Capability 列表中出现 exam_sprint
+- [ ] ⬆ **[点停] 验证**：pytest 通过，前端 Console 无报错，Capability 列表中出现 exam_sprint
 
 #### 变更记录
-- 新建文件：`deeptutor/capabilities/exam_sprint.py`（ExamSprintCapability，空壳 run()）
-- 新建文件：`deeptutor/exam/__init__.py` + `deeptutor/exam/streaming.py`（ExamStream 包装 StreamBus）
-- 修改文件：`deeptutor/runtime/bootstrap/builtin_capabilities.py`（注册 exam_sprint）
-- 验证：全部 8 个 capability 加载正常（7 现有 + 1 新增），前端无新增报错
-- 问题：无
+（执行中遇到的问题和修改记录在此）
 
 ### Phase 3: 前端 Dashboard 逐步填充
 
-- [ ] **3.1 掌握度表格 + 进度条**
+- [x] **3.1 掌握度表格 + 进度条**
   - ExamMasteryTable 组件（静态 mock 数据先）
   - 进度条复用 BookProgressRing 样式
 
-- [ ] **3.2 统计卡片行**
+- [x] **3.2 统计卡片行**
   - 今日任务 / 预估提分 / 连续天数 / 剩余天数
 
-- [ ] **3.3 时间压力横幅**
+- [x] **3.3 时间压力横幅**
   - TopWeakBanner 组件（红色置顶）
 
 - [ ] **3.4 任务列表**
@@ -70,7 +66,13 @@
 - [ ] ⬆ **[点停] 浏览器验证**：每一步截图确认 UI 渲染正确
 
 #### 变更记录
-（执行中遇到的问题和修改记录在此）
+- 新建 `web/components/exam-sprint/types.ts`（类型定义 + mock 数据）
+- 新建 `web/components/exam-sprint/ExamMasteryTable.tsx`（掌握度表格 + 彩色进度条）
+- 新建 `web/components/exam-sprint/StatCards.tsx`（4 张统计卡片）
+- 新建 `web/components/exam-sprint/TopWeakBanner.tsx`（时间压力红色横幅）
+- 修改 `web/app/(workspace)/exam-sprint/page.tsx`（组装 Dashboard 上半部分）
+- 修改 `web/locales/en/app.json` + `web/locales/zh/app.json`（新增 i18n 条目）
+- 问题：无
 
 ### Phase 4: 后端真实逻辑接入
 
