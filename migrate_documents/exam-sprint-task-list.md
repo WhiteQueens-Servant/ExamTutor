@@ -31,19 +31,22 @@
 - 修改文件：`web/locales/en/app.json` + `web/locales/zh/app.json`（添加 Exam Sprint i18n 条目）
 - 问题：无（Console 报错为预存的 session API 未连接问题，与本次改动无关）
 
-### Phase 2: 后端 Capability 注册
+### Phase 2: 后端 Capability 注册 ✅
 
-- [ ] **2.1 注册空 Capability**
+- [x] **2.1 注册空 Capability**
   - 创建 `deeptutor/capabilities/exam_sprint.py`（manifest only，run() 直接返回）
   - 注册到 `builtin_capabilities.py` 的 `BUILTIN_CAPABILITY_CLASSES`
 
-- [ ] **2.2 ExamStream 包装**
+- [x] **2.2 ExamStream 包装**
   - 复用 BookStream 模式，创建 `deeptutor/exam/streaming.py`
 
-- [ ] ⬆ **[点停] 验证**：pytest 通过，前端 Console 无报错，Capability 列表中出现 exam_sprint
+- [x] ⬆ **[点停] 验证**：pytest 通过，前端 Console 无报错，Capability 列表中出现 exam_sprint
 
 #### 变更记录
-（执行中遇到的问题和修改记录在此）
+- 新建 `deeptutor/capabilities/exam_sprint.py`（ExamSprintCapability，manifest + 空 run()）
+- 新建 `deeptutor/exam/__init__.py`（空包）
+- 新建 `deeptutor/exam/streaming.py`（ExamStream，SOURCE="exam_sprint"，阶段常量 + emit 方法）
+- 修改 `deeptutor/runtime/bootstrap/builtin_capabilities.py`（BUILTIN_CAPABILITY_CLASSES 添加 "exam_sprint" 入口）
 
 ### Phase 3: 前端 Dashboard 逐步填充
 
@@ -84,11 +87,15 @@
   - 零 token 消耗，pytest 验证
 
 - [ ] **4.2 QuestionPipeline 打通**
-  - 前端 QuizViewer 接真实后端数据（替换 mock）
+  - 后端 ExamSprintCapability 输出真实 QuizQuestion[]（替换 mock）
+  - 前端切回 QuizViewer（替换 QuizPreview），接入真实数据流
   - 记忆回写（capability_results + mastery 更新）
 
-- [ ] **4.3 RAG + LLM 降级**
-  - RAGTool 学习模式 + try/catch 降级到 llm.complete()
+- [ ] **4.3 RAG + LLM 降级 + 知识库选择器**
+  - 后端：ExamSprintCapability 接收 `kb_name` 参数，调用 `rag_service.search(query, kb_name)` 做精确范围检索
+  - 后端：RAG 不可用时降级到 `llm.complete()` 直接生成
+  - 前端：Dashboard 顶部增加知识库选择器（从已有 KB 列表选择，复用 `useKnowledgeBases` hook）
+  - 注意：Phase 4 仅做选择器，上传功能放在 Phase 5
 
 - [ ] **4.4 掌握度读写**
   - Capability 内读 L2（old mastery）→ 计算 → 对比 → 写回
@@ -109,6 +116,12 @@
 
 - [ ] **5.3 连续天数追踪**
   - `## Sprint` 字段记录 streak + last_active
+
+- [ ] **5.4 Exam Sprint 内知识库上传**
+  - 在 Exam Sprint Dashboard 知识库选择器旁增加「新建/上传」入口
+  - 复用现有 `createKnowledgeBase` + `uploadKnowledgeBaseFiles` API（`web/lib/knowledge-api.ts`）
+  - 上传完成后自动索引 + 自动选中新创建的 KB
+  - 用户无需跳转 Knowledge Base 页面即可完成材料上传
 
 - [ ] ⬆ **[点停] 最终验证**：完整用户旅程浏览器跑一遍
 
@@ -142,7 +155,9 @@
 
 1. **前端优先**：先用 mock 数据做 UI，后端逐步替换真实逻辑
 2. **不修改现有模块**：exam_sprint 是纯增量，所有现有代码不改动
-3. **QuizViewer 复用**：不重写，通过 Drawer 嵌入
+3. **QuizViewer 复用**：不重写，通过 Drawer 嵌入。Phase 4.2 后切回 QuizViewer（替换 QuizPreview）
 4. **记忆系统**：复用 L1/L2/L3，exam 作为新 surface type
 5. **StreamBus 复用**：ExamStream 包装，不改 StreamBus 本身
 6. **Git 推送方式**：始终使用 `git -c http.proxy="" -c https.proxy="" push`（绕过本地代理）
+7. **知识库隔离**：RAG 查询通过 `kb_name` 参数限定范围，不跨 KB 检索。Exam Sprint 支持用户选择/创建专属知识库
+8. **验证方式**：全部采用 web 模式（后端 `deeptutor serve` + 前端 `npm run dev` + Playwright + 手动实操），不使用 deeptutor CLI
