@@ -33,17 +33,21 @@
 
 ### Phase 2: 后端 Capability 注册
 
-- [ ] **2.1 注册空 Capability**
+- [x] **2.1 注册空 Capability**
   - 创建 `deeptutor/capabilities/exam_sprint.py`（manifest only，run() 直接返回）
   - 注册到 `builtin_capabilities.py` 的 `BUILTIN_CAPABILITY_CLASSES`
 
-- [ ] **2.2 ExamStream 包装**
+- [x] **2.2 ExamStream 包装**
   - 复用 BookStream 模式，创建 `deeptutor/exam/streaming.py`
 
-- [ ] ⬆ **[点停] 验证**：pytest 通过，前端 Console 无报错，Capability 列表中出现 exam_sprint
+- [x] ⬆ **[点停] 验证**：pytest 通过，前端 Console 无报错，Capability 列表中出现 exam_sprint
 
 #### 变更记录
-（执行中遇到的问题和修改记录在此）
+- 新建文件：`deeptutor/capabilities/exam_sprint.py`（ExamSprintCapability，空壳 run()）
+- 新建文件：`deeptutor/exam/__init__.py` + `deeptutor/exam/streaming.py`（ExamStream 包装 StreamBus）
+- 修改文件：`deeptutor/runtime/bootstrap/builtin_capabilities.py`（注册 exam_sprint）
+- 验证：全部 8 个 capability 加载正常（7 现有 + 1 新增），前端无新增报错
+- 问题：无
 
 ### Phase 3: 前端 Dashboard 逐步填充
 
@@ -136,3 +140,4 @@
 3. **QuizViewer 复用**：不重写，通过 Drawer 嵌入
 4. **记忆系统**：复用 L1/L2/L3，exam 作为新 surface type
 5. **StreamBus 复用**：ExamStream 包装，不改 StreamBus 本身
+6. **Git 推送方式**：始终使用 `git -c http.proxy="" -c https.proxy="" push`（绕过本地代理）
