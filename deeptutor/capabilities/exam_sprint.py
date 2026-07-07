@@ -28,7 +28,7 @@ class ExamSprintCapability(BaseCapability):
         name="exam_sprint",
         description="Exam preparation with time-pressure driven planning.",
         stages=["analysis", "planning", "execution", "review"],
-        tools_used=["weak_point_ranker", "plan_builder", "time_pressure", "rag", "question_pipeline"],
+        tools_used=["weak_point_ranker", "plan_builder", "time_pressure", "rag"],
         cli_aliases=["exam"],
         config_defaults={
             "mode": "sprint",  # sprint | practice | review

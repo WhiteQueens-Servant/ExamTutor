@@ -8,6 +8,7 @@ import logging
 from typing import Any
 
 from deeptutor.core.tool_protocol import BaseTool, ToolDefinition, ToolParameter, ToolResult
+from deeptutor.exam.tools import PlanBuilderTool, TimePressureTool, WeakPointRankerTool
 from deeptutor.tools.prompting import load_prompt_hints
 
 logger = logging.getLogger(__name__)
@@ -1121,6 +1122,9 @@ BUILTIN_TOOL_TYPES: tuple[type[BaseTool], ...] = (
     WriteNoteTool,
     GithubTool,
     AskUserTool,
+    TimePressureTool,
+    WeakPointRankerTool,
+    PlanBuilderTool,
 )
 
 # Tools whose implementation is parked while we redesign them. NOT loaded
