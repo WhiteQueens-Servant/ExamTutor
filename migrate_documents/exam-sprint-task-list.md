@@ -167,9 +167,9 @@
 - Phase 5.1 ✅ 数据层重构（profile.json 统一数据源）
 - Phase 5.2 ✅ 冷启动向导（SetupModal 多步骤，SSE 流式诊断）
 - Phase 5.3.1 ✅ 学习材料持久化（用户按需保存 + 学习历史入口）
-- Phase 5.3.2 ❌ 练习错题持久化（practice_history.json）
+- Phase 5.3.2 ✅ 练习错题持久化（practice_history.json + 错题本入口）
 - Phase 5.3.3 ❌ 诊断报告持久化
-- Phase 5.4 ❌ Dashboard 增强（诊断报告入口 / 错题本入口 / 重置按钮）
+- Phase 5.4 ❌ Dashboard 增强（诊断报告入口 / 重置按钮）
 - Phase 5.5 ❌ 最终验证（完整用户旅程浏览器跑一遍）
 
 #### 5.1 数据层重构（profile.json 统一数据源）
@@ -237,9 +237,9 @@
 - [x] 前端：LearnDrawer 增加"保存"按钮 + "已保存"提示
 
 **5.3.2 练习错题持久化**
-- [ ] 后端：`POST /diagnosis/submit` / Practice submit 时，错题写入 `practice_history.json`
-- [ ] 后端：`GET /practice/history` → 读取错题历史
-- [ ] 前端：Dashboard 增加"错题本"入口（查看历史错题）
+- [x] 后端：`POST /diagnosis/submit` 时，错题写入 `practice_history.json`
+- [x] 后端：`GET /practice/history` → 读取错题历史
+- [x] 前端：Dashboard 增加"错题本"入口（查看历史错题）
 
 **5.3.3 诊断报告持久化**
 - [ ] 诊断结果保存到 profile.json 的 diagnosis 对象
@@ -254,7 +254,7 @@
 - [ ] **掌握度表格**：数据来自 profile.json（已有，适配新数据源）
 - [ ] **TopWeakBanner**：数据来自 profile.json.weak_points（已有）
 - [ ] **新增：诊断报告入口** → 展示 diagnosis 对象内容
-- [ ] **新增：错题本入口** → 展示 practice_history.json 内容
+- [x] **新增：错题本入口** → 展示 practice_history.json 内容
 - [x] **新增：学习历史入口** → 列出 learn_history/ 文件
 - [ ] **新增：重置按钮**（含确认弹窗）→ 调用 POST /state/reset
 
@@ -319,6 +319,16 @@
 - 修改 `web/locales/en/app.json` + `web/locales/zh/app.json`（新增 Learn History 相关 i18n key）
 - 验证：浏览器端到端流程跑通 — 生成学习材料 → 点击保存 → 显示已保存提示 → 学习历史入口查看内容
 - 注意：改为用户按需保存（非自动生成即保存），提升用户体验
+
+##### Phase 5.3.2 练习错题持久化（已完成）
+- 新建 `deeptutor/exam/practice_history.py`（错题历史存储模块）
+- 修改 `deeptutor/api/routers/exam_sprint.py`（POST /diagnosis/submit 保存错题；新增 GET/DELETE /practice/history + /practice/history/{id}）
+- 修改 `web/lib/exam-sprint-api.ts`（新增 fetchPracticeHistory + fetchPracticeRecord + deletePracticeRecord API）
+- 新建 `web/components/exam-sprint/PracticeHistoryDrawer.tsx`（错题本查看组件：左侧列表 + 右侧详情）
+- 修改 `web/app/(workspace)/exam-sprint/page.tsx`（集成 PracticeHistoryDrawer，Dashboard 添加"错题本"入口按钮）
+- 修改 `web/locales/en/app.json` + `web/locales/zh/app.json`（新增 Practice History 相关 i18n key）
+- 验证：浏览器端到端流程跑通 — 诊断提交 → 错题自动保存 → 错题本入口查看 → 显示题目/答案对比/错误类型
+- 注意：诊断提交返回 `wrong_saved` 字段显示保存的错题数量
 
 （执行中遇到的问题和修改记录在此）
 
