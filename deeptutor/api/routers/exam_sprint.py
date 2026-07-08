@@ -297,28 +297,39 @@ async def generate_learn_content(req: LearnRequest) -> dict[str, Any]:
             detail=f"Learn generation failed: {type(exc).__name__}: {exc}",
         )
 
-    # 5. Save to learn history
-    from deeptutor.exam.learn_history import save_learn_content
-
-    save_result = save_learn_content(
-        knowledge_point=req.knowledge_point,
-        content=content,
-        source=source,
-        mastery_score=mastery_score,
-    )
-
+    # 5. Return content (save is user-initiated via /learn/save)
     return {
         "knowledge_point": req.knowledge_point,
         "content": content,
         "source": source,
         "mastery_score": mastery_score,
-        "saved": save_result,
     }
 
 
 # ---------------------------------------------------------------------------
 # Learn history endpoints
 # ---------------------------------------------------------------------------
+
+
+class LearnSaveRequest(BaseModel):
+    knowledge_point: str = Field(..., min_length=1, description="Knowledge point")
+    content: str = Field(..., min_length=1, description="Markdown content to save")
+    source: str = Field("llm", description="Content source: rag or llm")
+    mastery_score: float = Field(0.5, description="Mastery score at generation time")
+
+
+@router.post("/learn/save")
+async def save_learn_content(req: LearnSaveRequest) -> dict[str, Any]:
+    """Manually save learning content to history."""
+    from deeptutor.exam.learn_history import save_learn_content as save_content
+
+    save_result = save_content(
+        knowledge_point=req.knowledge_point,
+        content=req.content,
+        source=req.source,
+        mastery_score=req.mastery_score,
+    )
+    return save_result
 
 
 @router.get("/learn/history")

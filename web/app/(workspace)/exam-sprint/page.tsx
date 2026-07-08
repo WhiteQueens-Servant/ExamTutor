@@ -20,6 +20,7 @@ import {
   saveExamState,
   generateExamQuestions,
   generateLearnContent,
+  saveLearnContent,
   type ExamState,
   type DiagnosisSubmitResult,
 } from "@/lib/exam-sprint-api";
@@ -49,6 +50,8 @@ export default function ExamSprintPage() {
   const [learnLoading, setLearnLoading] = useState(false);
   const [learnError, setLearnError] = useState<string | null>(null);
   const [learnSaved, setLearnSaved] = useState(false);
+  const [learnMasteryScore, setLearnMasteryScore] = useState(0.5);
+  const [learnKnowledgePoint, setLearnKnowledgePoint] = useState("");
 
   // Fetch exam state + mastery on mount
   useEffect(() => {
@@ -172,6 +175,12 @@ export default function ExamSprintPage() {
         setLearnSource("");
         setLearnError(null);
         setLearnSaved(false);
+        setLearnKnowledgePoint(task.knowledge_point);
+        // Find mastery score for this knowledge point
+        const mp = mastery.find(
+          (m) => m.knowledge_point === task.knowledge_point,
+        );
+        setLearnMasteryScore(mp?.score ?? 0.5);
         setLearnLoading(true);
         setLearnOpen(true);
 
@@ -183,7 +192,6 @@ export default function ExamSprintPage() {
           });
           setLearnContent(result.content);
           setLearnSource(result.source);
-          setLearnSaved(true);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           setLearnError(msg);
@@ -192,8 +200,19 @@ export default function ExamSprintPage() {
         }
       }
     },
-    [t, selectedKb],
+    [t, selectedKb, mastery],
   );
+
+  const handleSaveLearn = useCallback(async () => {
+    if (!learnContent || !learnKnowledgePoint) return;
+    await saveLearnContent({
+      knowledge_point: learnKnowledgePoint,
+      content: learnContent,
+      source: learnSource || "llm",
+      mastery_score: learnMasteryScore,
+    });
+    setLearnSaved(true);
+  }, [learnContent, learnKnowledgePoint, learnSource, learnMasteryScore]);
 
   return (
     <div className="flex h-full min-h-full flex-col overflow-hidden bg-[var(--background)]">
@@ -266,6 +285,9 @@ export default function ExamSprintPage() {
         loading={learnLoading}
         error={learnError}
         saved={learnSaved}
+        knowledgePoint={learnKnowledgePoint}
+        masteryScore={learnMasteryScore}
+        onSave={handleSaveLearn}
       />
 
       {/* Setup modal (cold start) */}

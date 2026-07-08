@@ -1,6 +1,7 @@
 "use client";
 
-import { X, Check } from "lucide-react";
+import { useState } from "react";
+import { X, Check, Save } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import MarkdownRenderer from "@/components/common/MarkdownRenderer";
 
@@ -13,6 +14,9 @@ interface LearnDrawerProps {
   loading: boolean;
   error: string | null;
   saved?: boolean;
+  knowledgePoint?: string;
+  masteryScore?: number;
+  onSave?: () => Promise<void>;
 }
 
 export function LearnDrawer({
@@ -24,10 +28,24 @@ export function LearnDrawer({
   loading,
   error,
   saved = false,
+  knowledgePoint,
+  masteryScore = 0.5,
+  onSave,
 }: LearnDrawerProps) {
   const { t } = useTranslation();
+  const [saving, setSaving] = useState(false);
 
   if (!open) return null;
+
+  const handleSave = async () => {
+    if (!onSave) return;
+    setSaving(true);
+    try {
+      await onSave();
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -48,13 +66,26 @@ export function LearnDrawer({
               </div>
             )}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="ml-2 rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
-          >
-            <X size={16} />
-          </button>
+          <div className="flex items-center gap-2">
+            {content && !saved && onSave && (
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="flex items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3 py-1.5 text-xs font-medium text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90 disabled:opacity-50"
+              >
+                <Save size={14} />
+                {saving ? t("Saving...") : t("Save")}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Content */}

@@ -340,6 +340,38 @@ export interface LearnContentResponse {
   metadata: Record<string, string>;
 }
 
+export interface SaveLearnContentParams {
+  knowledge_point: string;
+  content: string;
+  source?: string;
+  mastery_score?: number;
+}
+
+/**
+ * Manually save learning content to history.
+ */
+export async function saveLearnContent(
+  params: SaveLearnContentParams,
+): Promise<{ file_path: string; filename: string; saved_at: string }> {
+  const res = await apiFetch(apiUrl("/api/v1/exam-sprint/learn/save"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      knowledge_point: params.knowledge_point,
+      content: params.content,
+      source: params.source ?? "llm",
+      mastery_score: params.mastery_score ?? 0.5,
+    }),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`Failed to save learn content (${res.status}): ${detail}`);
+  }
+
+  return res.json();
+}
+
 /**
  * List all saved learning materials.
  */
