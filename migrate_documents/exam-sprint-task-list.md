@@ -166,8 +166,10 @@
 #### 当前进度（2026-07-08）
 - Phase 5.1 ✅ 数据层重构（profile.json 统一数据源）
 - Phase 5.2 ✅ 冷启动向导（SetupModal 多步骤，SSE 流式诊断）
-- Phase 5.3 ❌ 内容持久化（learn_history / practice_history / diagnosis 报告）
-- Phase 5.4 ❌ Dashboard 增强（诊断报告入口 / 错题本入口 / 学习历史入口 / 重置按钮）
+- Phase 5.3.1 ✅ 学习材料持久化（用户按需保存 + 学习历史入口）
+- Phase 5.3.2 ❌ 练习错题持久化（practice_history.json）
+- Phase 5.3.3 ❌ 诊断报告持久化
+- Phase 5.4 ❌ Dashboard 增强（诊断报告入口 / 错题本入口 / 重置按钮）
 - Phase 5.5 ❌ 最终验证（完整用户旅程浏览器跑一遍）
 
 #### 5.1 数据层重构（profile.json 统一数据源）
@@ -253,7 +255,7 @@
 - [ ] **TopWeakBanner**：数据来自 profile.json.weak_points（已有）
 - [ ] **新增：诊断报告入口** → 展示 diagnosis 对象内容
 - [ ] **新增：错题本入口** → 展示 practice_history.json 内容
-- [ ] **新增：学习历史入口** → 列出 learn_history/ 文件
+- [x] **新增：学习历史入口** → 列出 learn_history/ 文件
 - [ ] **新增：重置按钮**（含确认弹窗）→ 调用 POST /state/reset
 
 - [ ] ⬆ **[点停] 浏览器验证**：Dashboard 各入口功能正常
@@ -306,6 +308,17 @@
 - 注意：诊断题目生成改为 SSE 流式方案（POST /diagnosis/stream），解决单次 LLM 调用生成多题 JSON 不可靠的超时问题
 - 注意：SSE 解析逻辑修复 — currentEventType 变量需在 for 循环外部声明以保持跨行状态
 - 注意：冷启动检测改为检查 `onboarding_completed` 字段
+
+##### Phase 5.3.1 学习材料持久化（已完成）
+- 新建 `deeptutor/exam/learn_history.py`（学习历史存储模块）
+- 修改 `deeptutor/api/routers/exam_sprint.py`（POST /learn 不再自动保存；新增 POST /learn/save 手动保存端点；新增 GET /learn/history + GET/DELETE /learn/history/{filename}）
+- 修改 `web/lib/exam-sprint-api.ts`（新增 saveLearnContent + fetchLearnHistory + fetchLearnContent + deleteLearnContent API）
+- 修改 `web/components/exam-sprint/LearnDrawer.tsx`（新增保存按钮 + saved 状态显示）
+- 新建 `web/components/exam-sprint/LearnHistoryDrawer.tsx`（学习历史查看组件：左侧列表 + 右侧内容预览）
+- 修改 `web/app/(workspace)/exam-sprint/page.tsx`（集成 LearnHistoryDrawer，Dashboard 添加"学习历史"入口按钮）
+- 修改 `web/locales/en/app.json` + `web/locales/zh/app.json`（新增 Learn History 相关 i18n key）
+- 验证：浏览器端到端流程跑通 — 生成学习材料 → 点击保存 → 显示已保存提示 → 学习历史入口查看内容
+- 注意：改为用户按需保存（非自动生成即保存），提升用户体验
 
 （执行中遇到的问题和修改记录在此）
 
