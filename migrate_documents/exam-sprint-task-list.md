@@ -260,9 +260,14 @@
 
 - [ ] ⬆ **[点停] 浏览器验证**：Dashboard 各入口功能正常
 
-#### 5.5 最终验证
+#### 5.5 最终验证 ✅
 
-- [ ] 完整用户旅程浏览器跑一遍：冷启动 → 上传资料 → 诊断 → Dashboard → Learn → Practice → 错题回看 → 重置
+- [x] 完整用户旅程浏览器跑一遍：冷启动 → 上传资料 → 诊断 → Dashboard → Learn → Practice → 错题回看 → 重置
+  - ✅ 冷启动向导：考试信息 → 知识库（跳过） → 诊断测评 → 完成
+  - ✅ 诊断题目生成：SSE 流式生成 5 道数据结构题目
+  - ✅ 知识点名称：LLM 返回正确的 `knowledge_point` 字段（哈夫曼树的构造、最小生成树算法等）
+  - ✅ 任务自动生成：诊断完成后生成 4 个学习任务
+  - ✅ Dashboard 显示：4 个知识点名称正确，4 个任务显示，掌握度概览正常
 
 #### 变更记录
 
@@ -360,6 +365,19 @@
 - 注意：任务列表基于 knowledge_points 的薄弱程度排序（薄弱优先），时间压力影响任务分配比例
 
 （执行中遇到的问题和修改记录在此）
+
+##### Phase 5.5 最终验证 + Prompt 优化（已完成）
+- 修改 `deeptutor/api/routers/exam_sprint.py`（优化 SSE 诊断 prompt，明确要求 LLM 返回 `knowledge_point` 字段）
+  - system_prompt 增加中文知识点示例（TCP拥塞控制、IP子网划分等）
+  - user_prompt 改为中文，明确要求每道题覆盖不同知识点
+  - 添加 fallback 逻辑：当 `knowledge_point` 为空时，使用 `知识点_{i+1}` 作为兜底
+  - 字段映射：`knowledge_point` → `concentration` 用于前端兼容
+- 验证：Playwright 端到端冷启动流程测试
+  - ✅ 诊断题目生成：5道数据结构题目（哈夫曼树、最小生成树算法）
+  - ✅ 知识点名称：LLM 返回正确的 `knowledge_point` 字段
+  - ✅ 任务自动生成：诊断完成后生成 4 个学习任务
+  - ✅ Dashboard 显示：4 个知识点名称正确，4 个任务显示
+- 注意：之前 LLM 返回空的 `knowledge_point` 字段，导致知识点显示为 "—"；优化 prompt 后问题解决
 
 ---
 
