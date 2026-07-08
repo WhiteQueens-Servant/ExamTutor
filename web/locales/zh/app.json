@@ -2133,5 +2133,15 @@
   "Your Strengths": "你的优势领域",
   "Learn History": "学习历史",
   "No saved materials yet": "暂无保存的学习资料",
-  "Select an item to view": "选择一项查看"
+  "Select an item to view": "选择一项查看",
+  "Practice History": "练习历史",
+  "No wrong questions yet": "暂无错题",
+  "Select a question to view details": "选择题目查看详情",
+  "Question": "题目",
+  "Options": "选项",
+  "Your Answer": "你的答案",
+  "Correct Answer": "正确答案",
+  "Error Type": "错误类型",
+  "Explanation": "解析",
+  "Wrong Questions": "错题本"
 }

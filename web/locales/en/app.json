@@ -2133,5 +2133,15 @@
   "Your Strengths": "Your Strengths",
   "Learn History": "Learn History",
   "No saved materials yet": "No saved materials yet",
-  "Select an item to view": "Select an item to view"
+  "Select an item to view": "Select an item to view",
+  "Practice History": "Practice History",
+  "No wrong questions yet": "No wrong questions yet",
+  "Select a question to view details": "Select a question to view details",
+  "Question": "Question",
+  "Options": "Options",
+  "Your Answer": "Your Answer",
+  "Correct Answer": "Correct Answer",
+  "Error Type": "Error Type",
+  "Explanation": "Explanation",
+  "Wrong Questions": "Wrong Questions"
 }

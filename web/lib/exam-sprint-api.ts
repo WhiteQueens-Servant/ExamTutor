@@ -453,3 +453,72 @@ export async function submitDiagnosis(params: {
   }
   return await res.json();
 }
+
+// ---------------------------------------------------------------------------
+// Practice history — wrong questions for review
+// ---------------------------------------------------------------------------
+
+export interface PracticeHistoryItem {
+  id: string;
+  question_id: string;
+  question: string;
+  question_type: string;
+  options: Record<string, string> | null;
+  correct_answer: string;
+  user_answer: string;
+  error_type: string;
+  knowledge_point: string;
+  explanation: string;
+  source: string;
+  saved_at: string;
+}
+
+export interface PracticeHistoryResponse {
+  items: PracticeHistoryItem[];
+  count: number;
+}
+
+/**
+ * List practice history (wrong questions), optionally filtered by knowledge point.
+ */
+export async function fetchPracticeHistory(
+  knowledgePoint?: string,
+): Promise<PracticeHistoryResponse> {
+  const params = knowledgePoint ? `?knowledge_point=${encodeURIComponent(knowledgePoint)}` : "";
+  const res = await apiFetch(apiUrl(`/api/v1/exam-sprint/practice/history${params}`));
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`Failed to fetch practice history (${res.status}): ${detail}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * Get a specific practice history record.
+ */
+export async function fetchPracticeRecord(recordId: string): Promise<PracticeHistoryItem> {
+  const res = await apiFetch(apiUrl(`/api/v1/exam-sprint/practice/history/${encodeURIComponent(recordId)}`));
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`Failed to fetch practice record (${res.status}): ${detail}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * Delete a specific practice history record.
+ */
+export async function deletePracticeRecord(recordId: string): Promise<void> {
+  const res = await apiFetch(apiUrl(`/api/v1/exam-sprint/practice/history/${encodeURIComponent(recordId)}`), {
+    method: "DELETE",
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`Failed to delete practice record (${res.status}): ${detail}`);
+  }
+}

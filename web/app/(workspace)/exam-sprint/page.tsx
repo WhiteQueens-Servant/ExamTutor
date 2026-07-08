@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Database, Target, BookOpen } from "lucide-react";
+import { Database, Target, BookOpen, AlertCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ExamMasteryTable } from "@/components/exam-sprint/ExamMasteryTable";
 import { LearnDrawer } from "@/components/exam-sprint/LearnDrawer";
 import { LearnHistoryDrawer } from "@/components/exam-sprint/LearnHistoryDrawer";
+import { PracticeHistoryDrawer } from "@/components/exam-sprint/PracticeHistoryDrawer";
 import { QuizDrawer } from "@/components/exam-sprint/QuizDrawer";
 import { SetupModal } from "@/components/exam-sprint/SetupModal";
 import { SprintTaskList } from "@/components/exam-sprint/SprintTaskList";
@@ -54,6 +55,7 @@ export default function ExamSprintPage() {
   const [learnMasteryScore, setLearnMasteryScore] = useState(0.5);
   const [learnKnowledgePoint, setLearnKnowledgePoint] = useState("");
   const [learnHistoryOpen, setLearnHistoryOpen] = useState(false);
+  const [practiceHistoryOpen, setPracticeHistoryOpen] = useState(false);
 
   // Fetch exam state + mastery on mount
   useEffect(() => {
@@ -269,6 +271,14 @@ export default function ExamSprintPage() {
               <BookOpen size={16} />
               {t("Learn History")}
             </button>
+            <button
+              type="button"
+              onClick={() => setPracticeHistoryOpen(true)}
+              className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--background)] px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]"
+            >
+              <AlertCircle size={16} />
+              {t("Wrong Questions")}
+            </button>
           </div>
 
           {/* Task list */}
@@ -308,6 +318,12 @@ export default function ExamSprintPage() {
       <LearnHistoryDrawer
         open={learnHistoryOpen}
         onClose={() => setLearnHistoryOpen(false)}
+      />
+
+      {/* Practice history drawer */}
+      <PracticeHistoryDrawer
+        open={practiceHistoryOpen}
+        onClose={() => setPracticeHistoryOpen(false)}
       />
 
       {/* Setup modal (cold start) */}

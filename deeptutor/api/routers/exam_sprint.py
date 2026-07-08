@@ -555,11 +555,21 @@ async def submit_diagnosis(req: DiagnosisSubmitRequest) -> dict[str, Any]:
 
     profile = init_from_diagnosis(req.exam_name, diagnosis_result)
 
+    # Save wrong questions to practice history
+    from deeptutor.exam.practice_history import save_wrong_question
+
+    wrong_count = 0
+    for a in req.answers:
+        if not a.get("is_correct"):
+            save_wrong_question(a, source="diagnosis")
+            wrong_count += 1
+
     return {
         "status": "ok",
         "overall_score": overall_score,
         "total_questions": total,
         "correct": correct,
+        "wrong_saved": wrong_count,
         "weak_points": weak_points,
         "strong_points": strong_points,
         "knowledge_points": profile.get("knowledge_points", []),
@@ -715,3 +725,39 @@ async def stream_diagnosis(req: DiagnosisGenerateRequest):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Practice history endpoints — wrong questions for review
+# ---------------------------------------------------------------------------
+
+
+@router.get("/practice/history")
+async def list_practice_history(knowledge_point: str | None = None) -> dict[str, Any]:
+    """List practice history (wrong questions), optionally filtered by knowledge point."""
+    from deeptutor.exam.practice_history import list_practice_history as list_history
+
+    items = list_history(knowledge_point=knowledge_point)
+    return {"items": items, "count": len(items)}
+
+
+@router.get("/practice/history/{record_id}")
+async def get_practice_history(record_id: str) -> dict[str, Any]:
+    """Get a specific practice history record."""
+    from deeptutor.exam.practice_history import get_practice_history as get_history
+
+    result = get_history(record_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Practice record not found: {record_id}")
+    return result
+
+
+@router.delete("/practice/history/{record_id}")
+async def delete_practice_history(record_id: str) -> dict[str, str]:
+    """Delete a specific practice history record."""
+    from deeptutor.exam.practice_history import delete_practice_history as delete_history
+
+    deleted = delete_history(record_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Practice record not found: {record_id}")
+    return {"status": "deleted", "id": record_id}
