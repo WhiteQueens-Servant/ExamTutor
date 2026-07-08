@@ -169,8 +169,8 @@
 - Phase 5.3.1 ✅ 学习材料持久化（用户按需保存 + 学习历史入口）
 - Phase 5.3.2 ✅ 练习错题持久化（practice_history.json + 错题本入口）
 - Phase 5.3.3 ✅ 诊断报告持久化 + 日常练习错题自动保存
-- Phase 5.4 ❌ Dashboard 增强（重置按钮）
-- Phase 5.5 ❌ 最终验证（完整用户旅程浏览器跑一遍）
+- Phase 5.4 ✅ 任务系统闭环（动态生成 + 完成追踪 + Dashboard 真实数据）
+- Phase 5.5 ❌ 重置按钮 + 最终验证
 
 #### 5.1 数据层重构（profile.json 统一数据源）
 
@@ -348,6 +348,16 @@
 - 修改 `web/app/(workspace)/exam-sprint/page.tsx`（添加 handleQuizComplete 自动保存逻辑）
 - 验证：Quiz 完成后自动保存错题到 practice_history.json，用户可在错题本中查看和删除
 - 注意：对 QuizViewer/QuizPreview 核心链路零侵入，仅在 Exam Sprint 专属组件（QuizDrawer）中添加回调
+
+（执行中遇到的问题和修改记录在此）
+
+##### Phase 5.4 任务系统闭环（已完成）
+- 新建 `deeptutor/exam/tasks.py`（任务存储模块：load_tasks/save_tasks/complete_task/generate_tasks_from_diagnosis）
+- 修改 `deeptutor/api/routers/exam_sprint.py`（新增 GET /tasks、POST /task/complete、POST /task/generate 端点；诊断完成后自动生成任务）
+- 修改 `web/lib/exam-sprint-api.ts`（新增 SprintTask/TaskListResponse 类型 + fetchTasks/completeTask/generateTasks API）
+- 修改 `web/app/(workspace)/exam-sprint/page.tsx`（从 API 获取真实任务列表，完成任务后调用 completeTask 更新状态，Dashboard 显示真实进度）
+- 验证：诊断完成后自动生成任务列表 → Dashboard 显示真实任务 → 完成 practice 后任务状态自动更新 → 今日任务进度实时显示
+- 注意：任务列表基于 knowledge_points 的薄弱程度排序（薄弱优先），时间压力影响任务分配比例
 
 （执行中遇到的问题和修改记录在此）
 
