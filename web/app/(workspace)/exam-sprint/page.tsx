@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Database, Target } from "lucide-react";
+import { Database, Target, BookOpen } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ExamMasteryTable } from "@/components/exam-sprint/ExamMasteryTable";
 import { LearnDrawer } from "@/components/exam-sprint/LearnDrawer";
+import { LearnHistoryDrawer } from "@/components/exam-sprint/LearnHistoryDrawer";
 import { QuizDrawer } from "@/components/exam-sprint/QuizDrawer";
 import { SetupModal } from "@/components/exam-sprint/SetupModal";
 import { SprintTaskList } from "@/components/exam-sprint/SprintTaskList";
@@ -52,6 +53,7 @@ export default function ExamSprintPage() {
   const [learnSaved, setLearnSaved] = useState(false);
   const [learnMasteryScore, setLearnMasteryScore] = useState(0.5);
   const [learnKnowledgePoint, setLearnKnowledgePoint] = useState("");
+  const [learnHistoryOpen, setLearnHistoryOpen] = useState(false);
 
   // Fetch exam state + mastery on mount
   useEffect(() => {
@@ -257,6 +259,18 @@ export default function ExamSprintPage() {
           {/* Stat cards */}
           <StatCards meta={meta} />
 
+          {/* Quick actions */}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setLearnHistoryOpen(true)}
+              className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--background)] px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]"
+            >
+              <BookOpen size={16} />
+              {t("Learn History")}
+            </button>
+          </div>
+
           {/* Task list */}
           <SprintTaskList tasks={MOCK_TASKS} onAction={handleTaskAction} />
 
@@ -288,6 +302,12 @@ export default function ExamSprintPage() {
         knowledgePoint={learnKnowledgePoint}
         masteryScore={learnMasteryScore}
         onSave={handleSaveLearn}
+      />
+
+      {/* Learn history drawer */}
+      <LearnHistoryDrawer
+        open={learnHistoryOpen}
+        onClose={() => setLearnHistoryOpen(false)}
       />
 
       {/* Setup modal (cold start) */}

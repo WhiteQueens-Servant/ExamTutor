@@ -229,10 +229,10 @@
 > 解决"生成内容无落点"问题。
 
 **5.3.1 学习材料持久化**
-- [ ] 后端：`POST /learn` 增加 learn_history 保存
+- [x] 后端：`POST /learn/save` 手动保存端点
   - 生成的 Markdown 保存到 `data/exam_sprint/learn_history/YYYY-MM-DD_HH-MM_<知识点>.md`
-- [ ] 后端：`GET /learn/history` → 列出已保存的学习材料
-- [ ] 前端：LearnDrawer 增加"已保存"提示 + 历史记录入口
+- [x] 后端：`GET /learn/history` → 列出已保存的学习材料
+- [x] 前端：LearnDrawer 增加"保存"按钮 + "已保存"提示
 
 **5.3.2 练习错题持久化**
 - [ ] 后端：`POST /diagnosis/submit` / Practice submit 时，错题写入 `practice_history.json`
