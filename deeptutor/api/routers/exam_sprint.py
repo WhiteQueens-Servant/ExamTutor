@@ -753,18 +753,24 @@ async def stream_diagnosis(req: DiagnosisGenerateRequest):
             system_prompt = (
                 "You are an exam diagnostic question generator. "
                 "Generate exactly ONE diagnostic question. "
-                "Return a JSON object (not array) with: "
-                "question_id (string), question (string), question_type ('choice'|'short_answer'), "
-                "options (object with A/B/C/D keys, or null for short_answer), "
-                "correct_answer (string), explanation (string), "
-                "difficulty ('easy'|'medium'|'hard'), knowledge_point (string). "
+                "Return a JSON object (not array) with these EXACT fields: "
+                "question_id (string like 'CN_001'), "
+                "question (string - the question text), "
+                "question_type ('choice' for multiple choice, 'short_answer' for fill-in), "
+                "options (object with A/B/C/D keys and Chinese text values, or null for short_answer), "
+                "correct_answer (string - the correct option letter like 'A'/'B'/'C'/'D'), "
+                "explanation (string - detailed explanation in Chinese), "
+                "difficulty ('easy'|'medium'|'hard'), "
+                "knowledge_point (string - the specific topic name in Chinese like 'TCP拥塞控制' or 'IP子网划分'). "
+                "IMPORTANT: knowledge_point MUST be a non-empty Chinese string describing the topic. "
                 "Return ONLY the JSON object, no other text."
             )
 
             user_prompt = (
-                f"Generate diagnostic question {i+1}/{total_questions} for: {req.exam_name}\n"
-                f"Cover a different topic each time. Vary difficulty levels.\n"
-                "Return ONLY the JSON object."
+                f"Generate diagnostic question {i+1}/{total_questions} for exam: {req.exam_name}\n"
+                f"Each question must cover a DIFFERENT knowledge point (e.g., TCP, IP, subnet, routing, etc.).\n"
+                f"Vary difficulty levels across questions.\n"
+                "Return ONLY the JSON object with all required fields."
             )
 
             try:
@@ -817,6 +823,10 @@ async def stream_diagnosis(req: DiagnosisGenerateRequest):
                 # Ensure question_id
                 if not question.get("question_id"):
                     question["question_id"] = f"diag_{i+1}"
+
+                # Map knowledge_point to concentration for frontend compatibility
+                if question.get("knowledge_point") and not question.get("concentration"):
+                    question["concentration"] = question["knowledge_point"]
 
                 generated += 1
                 event_data = _json.dumps({
