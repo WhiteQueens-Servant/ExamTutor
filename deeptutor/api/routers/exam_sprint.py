@@ -589,6 +589,22 @@ async def get_profile() -> dict[str, Any]:
     return load_profile()
 
 
+@router.get("/diagnosis/report")
+async def get_diagnosis_report() -> dict[str, Any]:
+    """Return the diagnosis report from profile.
+
+    Contains: completed_at, total_questions, correct, overall_score,
+    questions (with user answers), weak_points, strong_points.
+    """
+    from deeptutor.exam.profile import load_profile
+
+    profile = load_profile()
+    diagnosis = profile.get("diagnosis")
+    if diagnosis is None:
+        raise HTTPException(status_code=404, detail="No diagnosis report found")
+    return diagnosis
+
+
 # ---------------------------------------------------------------------------
 # State reset — destructive, clears all exam data
 # ---------------------------------------------------------------------------

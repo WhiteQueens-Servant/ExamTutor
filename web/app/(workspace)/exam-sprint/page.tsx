@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Database, Target, BookOpen, AlertCircle } from "lucide-react";
+import { Database, Target, BookOpen, AlertCircle, ClipboardCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { ExamMasteryTable } from "@/components/exam-sprint/ExamMasteryTable";
 import { LearnDrawer } from "@/components/exam-sprint/LearnDrawer";
 import { LearnHistoryDrawer } from "@/components/exam-sprint/LearnHistoryDrawer";
 import { PracticeHistoryDrawer } from "@/components/exam-sprint/PracticeHistoryDrawer";
+import { DiagnosticReportDrawer } from "@/components/exam-sprint/DiagnosticReportDrawer";
 import { QuizDrawer } from "@/components/exam-sprint/QuizDrawer";
 import { SetupModal } from "@/components/exam-sprint/SetupModal";
 import { SprintTaskList } from "@/components/exam-sprint/SprintTaskList";
@@ -56,6 +57,7 @@ export default function ExamSprintPage() {
   const [learnKnowledgePoint, setLearnKnowledgePoint] = useState("");
   const [learnHistoryOpen, setLearnHistoryOpen] = useState(false);
   const [practiceHistoryOpen, setPracticeHistoryOpen] = useState(false);
+  const [diagnosisReportOpen, setDiagnosisReportOpen] = useState(false);
 
   // Fetch exam state + mastery on mount
   useEffect(() => {
@@ -279,6 +281,14 @@ export default function ExamSprintPage() {
               <AlertCircle size={16} />
               {t("Wrong Questions")}
             </button>
+            <button
+              type="button"
+              onClick={() => setDiagnosisReportOpen(true)}
+              className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--background)] px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]"
+            >
+              <ClipboardCheck size={16} />
+              {t("Diagnosis Report")}
+            </button>
           </div>
 
           {/* Task list */}
@@ -324,6 +334,12 @@ export default function ExamSprintPage() {
       <PracticeHistoryDrawer
         open={practiceHistoryOpen}
         onClose={() => setPracticeHistoryOpen(false)}
+      />
+
+      {/* Diagnostic report drawer */}
+      <DiagnosticReportDrawer
+        open={diagnosisReportOpen}
+        onClose={() => setDiagnosisReportOpen(false)}
       />
 
       {/* Setup modal (cold start) */}

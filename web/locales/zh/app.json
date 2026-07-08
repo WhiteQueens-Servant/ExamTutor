@@ -2143,5 +2143,11 @@
   "Correct Answer": "正确答案",
   "Error Type": "错误类型",
   "Explanation": "解析",
-  "Wrong Questions": "错题本"
+  "Wrong Questions": "错题本",
+  "Diagnosis Report": "诊断报告",
+  "No diagnosis report available": "暂无诊断报告",
+  "Overall Score": "总分",
+  "Weak Points": "薄弱知识点",
+  "Strong Points": "优势知识点",
+  "Knowledge Point": "知识点"
 }

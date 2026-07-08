@@ -455,6 +455,44 @@ export async function submitDiagnosis(params: {
 }
 
 // ---------------------------------------------------------------------------
+// Diagnosis report
+// ---------------------------------------------------------------------------
+
+export interface DiagnosisQuestion {
+  question_id: string;
+  question: string;
+  correct_answer: string;
+  user_answer: string;
+  is_correct: boolean;
+  error_type: string;
+  knowledge_point: string;
+}
+
+export interface DiagnosisReport {
+  completed_at: string;
+  total_questions: number;
+  correct: number;
+  overall_score: number;
+  questions: DiagnosisQuestion[];
+  weak_points: string[];
+  strong_points: string[];
+}
+
+/**
+ * Get the diagnosis report from profile.
+ */
+export async function fetchDiagnosisReport(): Promise<DiagnosisReport> {
+  const res = await apiFetch(apiUrl("/api/v1/exam-sprint/diagnosis/report"));
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`Failed to fetch diagnosis report (${res.status}): ${detail}`);
+  }
+
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
 // Practice history — wrong questions for review
 // ---------------------------------------------------------------------------
 

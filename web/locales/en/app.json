@@ -2143,5 +2143,11 @@
   "Correct Answer": "Correct Answer",
   "Error Type": "Error Type",
   "Explanation": "Explanation",
-  "Wrong Questions": "Wrong Questions"
+  "Wrong Questions": "Wrong Questions",
+  "Diagnosis Report": "Diagnosis Report",
+  "No diagnosis report available": "No diagnosis report available",
+  "Overall Score": "Overall Score",
+  "Weak Points": "Weak Points",
+  "Strong Points": "Strong Points",
+  "Knowledge Point": "Knowledge Point"
 }
