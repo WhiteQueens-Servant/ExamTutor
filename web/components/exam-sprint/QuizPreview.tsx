@@ -1,22 +1,57 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { CheckCircle, XCircle } from "lucide-react";
 import MarkdownRenderer from "@/components/common/MarkdownRenderer";
 import type { QuizQuestion } from "@/lib/quiz-types";
+import type { QuizAnswerRecord } from "./QuizDrawer";
+
+interface QuizPreviewProps {
+  questions: QuizQuestion[];
+  onComplete?: (answers: QuizAnswerRecord[]) => void;
+}
 
 /**
  * Lightweight quiz preview — displays questions without backend dependencies.
  * Used in QuizDrawer for V0. Will be replaced by full QuizViewer in Phase 4
  * when backend is connected.
  */
-export function QuizPreview({ questions }: { questions: QuizQuestion[] }) {
+export function QuizPreview({ questions, onComplete }: QuizPreviewProps) {
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [submitted, setSubmitted] = useState<Record<number, boolean>>({});
+  const [completed, setCompleted] = useState(false);
 
   const q = questions[idx];
   const total = questions.length;
+
+  const handleComplete = useCallback(() => {
+    if (completed || !onComplete) return;
+
+    // Collect wrong answers
+    const wrongAnswers: QuizAnswerRecord[] = [];
+    questions.forEach((q, i) => {
+      const userAnswer = answers[i] ?? "";
+      const isCorrect = userAnswer === q.correct_answer;
+      if (!isCorrect && userAnswer) {
+        wrongAnswers.push({
+          question_id: q.question_id,
+          question: q.question,
+          question_type: q.question_type,
+          options: q.options,
+          correct_answer: q.correct_answer,
+          user_answer: userAnswer,
+          is_correct: false,
+          error_type: "wrong_answer",
+          knowledge_point: q.concentration ?? "unknown",
+          explanation: q.explanation,
+        });
+      }
+    });
+
+    setCompleted(true);
+    onComplete(wrongAnswers);
+  }, [answers, questions, onComplete, completed]);
 
   if (!q) {
     return (
@@ -178,6 +213,14 @@ export function QuizPreview({ questions }: { questions: QuizQuestion[] }) {
               className="rounded-lg bg-[var(--primary)] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
             >
               Next
+            </button>
+          ) : !completed ? (
+            <button
+              type="button"
+              onClick={handleComplete}
+              className="rounded-lg bg-[var(--primary)] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90"
+            >
+              Complete
             </button>
           ) : (
             <span className="text-xs text-[var(--muted-foreground)]">

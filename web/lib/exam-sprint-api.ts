@@ -560,3 +560,43 @@ export async function deletePracticeRecord(recordId: string): Promise<void> {
     throw new Error(`Failed to delete practice record (${res.status}): ${detail}`);
   }
 }
+
+export interface SaveWrongBatchParams {
+  questions: Array<{
+    question_id: string;
+    question: string;
+    question_type: string;
+    options?: Record<string, string> | null;
+    correct_answer: string;
+    user_answer: string;
+    is_correct: boolean;
+    error_type: string;
+    knowledge_point: string;
+    explanation?: string;
+  }>;
+  source?: string;
+}
+
+/**
+ * Batch save wrong questions to practice history.
+ * Used by daily practice to automatically save wrong answers.
+ */
+export async function saveWrongQuestionsBatch(
+  params: SaveWrongBatchParams,
+): Promise<{ status: string; saved_count: number; source: string }> {
+  const res = await apiFetch(apiUrl("/api/v1/exam-sprint/practice/save-wrong-batch"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      questions: params.questions,
+      source: params.source ?? "practice",
+    }),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`Failed to save wrong questions (${res.status}): ${detail}`);
+  }
+
+  return res.json();
+}

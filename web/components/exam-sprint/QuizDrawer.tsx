@@ -5,6 +5,19 @@ import { useTranslation } from "react-i18next";
 import type { QuizQuestion } from "@/lib/quiz-types";
 import { QuizPreview } from "./QuizPreview";
 
+export interface QuizAnswerRecord {
+  question_id: string;
+  question: string;
+  question_type: string;
+  options?: Record<string, string> | null;
+  correct_answer: string;
+  user_answer: string;
+  is_correct: boolean;
+  error_type: string;
+  knowledge_point: string;
+  explanation?: string;
+}
+
 interface QuizDrawerProps {
   open: boolean;
   onClose: () => void;
@@ -12,6 +25,7 @@ interface QuizDrawerProps {
   title?: string;
   loading?: boolean;
   error?: string | null;
+  onComplete?: (answers: QuizAnswerRecord[]) => void;
 }
 
 export function QuizDrawer({
@@ -21,6 +35,7 @@ export function QuizDrawer({
   title,
   loading = false,
   error = null,
+  onComplete,
 }: QuizDrawerProps) {
   const { t } = useTranslation();
 
@@ -77,7 +92,7 @@ export function QuizDrawer({
           )}
 
           {!loading && !error && questions.length > 0 && (
-            <QuizPreview questions={questions} />
+            <QuizPreview questions={questions} onComplete={onComplete} />
           )}
 
           {!loading && !error && questions.length === 0 && (

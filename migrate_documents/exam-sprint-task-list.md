@@ -168,7 +168,7 @@
 - Phase 5.2 ✅ 冷启动向导（SetupModal 多步骤，SSE 流式诊断）
 - Phase 5.3.1 ✅ 学习材料持久化（用户按需保存 + 学习历史入口）
 - Phase 5.3.2 ✅ 练习错题持久化（practice_history.json + 错题本入口）
-- Phase 5.3.3 ✅ 诊断报告持久化（profile.json.diagnosis + 诊断报告入口）
+- Phase 5.3.3 ✅ 诊断报告持久化 + 日常练习错题自动保存
 - Phase 5.4 ❌ Dashboard 增强（重置按钮）
 - Phase 5.5 ❌ 最终验证（完整用户旅程浏览器跑一遍）
 
@@ -330,7 +330,8 @@
 - 验证：浏览器端到端流程跑通 — 诊断提交 → 错题自动保存 → 错题本入口查看 → 显示题目/答案对比/错误类型
 - 注意：诊断提交返回 `wrong_saved` 字段显示保存的错题数量
 
-##### Phase 5.3.3 诊断报告持久化（已完成）
+##### Phase 5.3.3 诊断报告持久化 + 日常练习错题自动保存（已完成）
+**Part A: 诊断报告持久化**
 - 修改 `deeptutor/api/routers/exam_sprint.py`（新增 GET /diagnosis/report 端点）
 - 修改 `web/lib/exam-sprint-api.ts`（新增 fetchDiagnosisReport API + DiagnosisReport/DiagnosisQuestion 类型）
 - 新建 `web/components/exam-sprint/DiagnosticReportDrawer.tsx`（诊断报告查看组件：摘要 + 题目列表 + 详情）
@@ -338,6 +339,15 @@
 - 修改 `web/locales/en/app.json` + `web/locales/zh/app.json`（新增 Diagnosis Report 相关 i18n key）
 - 验证：浏览器端到端流程跑通 — 诊断报告入口 → 显示摘要（总分/正确率）→ 薄弱/优势知识点 → 题目列表 → 题目详情（答案对比/错误类型/知识点）
 - 注意：诊断报告数据已存储在 profile.json 的 diagnosis 对象中
+
+**Part B: 日常练习错题自动保存（方案C: 自动保存 + 取消选项）**
+- 修改 `deeptutor/api/routers/exam_sprint.py`（新增 POST /practice/save-wrong-batch 批量保存端点）
+- 修改 `web/lib/exam-sprint-api.ts`（新增 saveWrongQuestionsBatch API + SaveWrongBatchParams 类型）
+- 修改 `web/components/exam-sprint/QuizDrawer.tsx`（添加 onComplete 回调 + QuizAnswerRecord 类型导出）
+- 修改 `web/components/exam-sprint/QuizPreview.tsx`（添加 onComplete 支持，Complete 按钮触发回调）
+- 修改 `web/app/(workspace)/exam-sprint/page.tsx`（添加 handleQuizComplete 自动保存逻辑）
+- 验证：Quiz 完成后自动保存错题到 practice_history.json，用户可在错题本中查看和删除
+- 注意：对 QuizViewer/QuizPreview 核心链路零侵入，仅在 Exam Sprint 专属组件（QuizDrawer）中添加回调
 
 （执行中遇到的问题和修改记录在此）
 

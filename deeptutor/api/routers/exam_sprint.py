@@ -777,3 +777,30 @@ async def delete_practice_history(record_id: str) -> dict[str, str]:
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Practice record not found: {record_id}")
     return {"status": "deleted", "id": record_id}
+
+
+class PracticeSaveWrongBatchRequest(BaseModel):
+    questions: list[dict[str, Any]] = Field(
+        ..., description="List of wrong question records to save"
+    )
+    source: str = Field("practice", description="Source identifier (practice/diagnosis)")
+
+
+@router.post("/practice/save-wrong-batch")
+async def save_wrong_questions_batch(req: PracticeSaveWrongBatchRequest) -> dict[str, Any]:
+    """Batch save wrong questions to practice history.
+
+    Used by daily practice to automatically save wrong answers.
+    """
+    from deeptutor.exam.practice_history import save_wrong_question
+
+    saved_count = 0
+    for q in req.questions:
+        save_wrong_question(q, source=req.source)
+        saved_count += 1
+
+    return {
+        "status": "ok",
+        "saved_count": saved_count,
+        "source": req.source,
+    }

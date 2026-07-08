@@ -24,9 +24,11 @@ import {
   generateExamQuestions,
   generateLearnContent,
   saveLearnContent,
+  saveWrongQuestionsBatch,
   type ExamState,
   type DiagnosisSubmitResult,
 } from "@/lib/exam-sprint-api";
+import type { QuizAnswerRecord } from "@/components/exam-sprint/QuizDrawer";
 import { fetchMastery } from "@/lib/exam-sprint-mastery-api";
 import { useKnowledgeBases } from "@/hooks/useKnowledgeBases";
 
@@ -220,6 +222,20 @@ export default function ExamSprintPage() {
     setLearnSaved(true);
   }, [learnContent, learnKnowledgePoint, learnSource, learnMasteryScore]);
 
+  // Auto-save wrong questions when quiz completes
+  const handleQuizComplete = useCallback(async (wrongAnswers: QuizAnswerRecord[]) => {
+    if (wrongAnswers.length === 0) return;
+    try {
+      await saveWrongQuestionsBatch({
+        questions: wrongAnswers,
+        source: "practice",
+      });
+      console.log(`Auto-saved ${wrongAnswers.length} wrong questions to practice history`);
+    } catch (err) {
+      console.error("Failed to auto-save wrong questions:", err);
+    }
+  }, []);
+
   return (
     <div className="flex h-full min-h-full flex-col overflow-hidden bg-[var(--background)]">
       <header className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-6 py-3">
@@ -307,6 +323,7 @@ export default function ExamSprintPage() {
         title={drawerTitle}
         loading={drawerLoading}
         error={drawerError}
+        onComplete={handleQuizComplete}
       />
 
       {/* Learn drawer */}
