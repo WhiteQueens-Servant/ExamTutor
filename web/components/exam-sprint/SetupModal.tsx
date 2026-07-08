@@ -17,6 +17,7 @@ import { useTranslation } from "react-i18next";
 import type { QuizQuestion } from "@/lib/quiz-types";
 import {
   generateDiagnosis,
+  streamDiagnosis,
   submitDiagnosis,
   type DiagnosisSubmitResult,
 } from "@/lib/exam-sprint-api";
@@ -118,17 +119,28 @@ export function SetupModal({ open, onComplete, loading, error }: SetupModalProps
     await generateDiagnosisQuestions();
   };
 
-  // ── Step 3: Diagnosis ──
+  // ── Step 3: Diagnosis (SSE streaming) ──
   const generateDiagnosisQuestions = async () => {
     setDiagnosisLoading(true);
     setDiagnosisError(null);
+    setDiagnosisQuestions([]); // Clear previous questions
+
     try {
-      const questions = await generateDiagnosis({
+      await streamDiagnosis({
         exam_name: examName.trim(),
         kb_name: kbName.trim(),
         language: "zh",
+        onQuestion: (question, index, total) => {
+          // Append each question as it arrives
+          setDiagnosisQuestions((prev) => [...prev, question]);
+        },
+        onError: (message) => {
+          setDiagnosisError(message);
+        },
+        onComplete: (total) => {
+          setDiagnosisLoading(false);
+        },
       });
-      setDiagnosisQuestions(questions);
     } catch (err) {
       setDiagnosisError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -364,15 +376,6 @@ export function SetupModal({ open, onComplete, loading, error }: SetupModalProps
                 </p>
               </div>
 
-              {diagnosisLoading && (
-                <div className="flex flex-col items-center gap-3 py-10">
-                  <Loader2 size={24} className="animate-spin text-[var(--primary)]" />
-                  <span className="text-sm text-[var(--muted-foreground)]">
-                    {t("Generating diagnostic questions...")}
-                  </span>
-                </div>
-              )}
-
               {diagnosisError && (
                 <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-800/30 dark:bg-rose-950/20 dark:text-rose-300">
                   {diagnosisError}
@@ -385,10 +388,13 @@ export function SetupModal({ open, onComplete, loading, error }: SetupModalProps
                 </div>
               )}
 
-              {!diagnosisLoading && !diagnosisError && diagnosisQuestions.length > 0 && (
+              {/* Show questions as they arrive via SSE */}
+              {diagnosisQuestions.length > 0 && (
                 <div className="space-y-4">
                   <div className="text-xs text-[var(--muted-foreground)]">
-                    {t("{count} questions", { count: diagnosisQuestions.length })}
+                    {diagnosisLoading
+                      ? t("Generating... {count} questions so far", { count: diagnosisQuestions.length })
+                      : t("{count} questions", { count: diagnosisQuestions.length })}
                   </div>
                   {diagnosisQuestions.map((q, idx) => (
                     <div
@@ -428,6 +434,26 @@ export function SetupModal({ open, onComplete, loading, error }: SetupModalProps
                       )}
                     </div>
                   ))}
+
+                  {/* Loading indicator while SSE is streaming */}
+                  {diagnosisLoading && (
+                    <div className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--secondary)]/30 p-3">
+                      <Loader2 size={16} className="animate-spin text-[var(--primary)]" />
+                      <span className="text-sm text-[var(--muted-foreground)]">
+                        {t("Generating next question...")}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Initial loading state (no questions yet) */}
+              {diagnosisLoading && diagnosisQuestions.length === 0 && !diagnosisError && (
+                <div className="flex flex-col items-center gap-3 py-10">
+                  <Loader2 size={24} className="animate-spin text-[var(--primary)]" />
+                  <span className="text-sm text-[var(--muted-foreground)]">
+                    {t("Generating diagnostic questions...")}
+                  </span>
                 </div>
               )}
             </div>

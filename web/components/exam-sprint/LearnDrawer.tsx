@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { X, Check } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import MarkdownRenderer from "@/components/common/MarkdownRenderer";
 
@@ -12,6 +12,7 @@ interface LearnDrawerProps {
   source: "rag" | "llm" | "";
   loading: boolean;
   error: string | null;
+  saved?: boolean;
 }
 
 export function LearnDrawer({
@@ -22,6 +23,7 @@ export function LearnDrawer({
   source,
   loading,
   error,
+  saved = false,
 }: LearnDrawerProps) {
   const { t } = useTranslation();
 
@@ -73,9 +75,17 @@ export function LearnDrawer({
           )}
 
           {!loading && !error && content && (
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <MarkdownRenderer content={content} enableMath enableCode />
-            </div>
+            <>
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <MarkdownRenderer content={content} enableMath enableCode />
+              </div>
+              {saved && (
+                <div className="mt-4 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-800/30 dark:bg-emerald-950/20 dark:text-emerald-300">
+                  <Check size={14} />
+                  {t("Content saved to history")}
+                </div>
+              )}
+            </>
           )}
 
           {!loading && !error && !content && (

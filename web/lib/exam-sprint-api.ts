@@ -316,6 +316,72 @@ export async function streamDiagnosis(params: {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Learn history
+// ---------------------------------------------------------------------------
+
+export interface LearnHistoryItem {
+  filename: string;
+  file_path: string;
+  knowledge_point: string;
+  source: string;
+  mastery_score: number;
+  saved_at: string;
+}
+
+export interface LearnHistoryResponse {
+  items: LearnHistoryItem[];
+  count: number;
+}
+
+export interface LearnContentResponse {
+  filename: string;
+  content: string;
+  metadata: Record<string, string>;
+}
+
+/**
+ * List all saved learning materials.
+ */
+export async function fetchLearnHistory(): Promise<LearnHistoryResponse> {
+  const res = await apiFetch(apiUrl("/api/v1/exam-sprint/learn/history"));
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`Failed to fetch learn history (${res.status}): ${detail}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * Get a specific learning material by filename.
+ */
+export async function fetchLearnContent(filename: string): Promise<LearnContentResponse> {
+  const res = await apiFetch(apiUrl(`/api/v1/exam-sprint/learn/history/${encodeURIComponent(filename)}`));
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`Failed to fetch learn content (${res.status}): ${detail}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * Delete a specific learning material.
+ */
+export async function deleteLearnContent(filename: string): Promise<void> {
+  const res = await apiFetch(apiUrl(`/api/v1/exam-sprint/learn/history/${encodeURIComponent(filename)}`), {
+    method: "DELETE",
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`Failed to delete learn content (${res.status}): ${detail}`);
+  }
+}
+
 export interface DiagnosisSubmitResult {
   status: string;
   overall_score: number;

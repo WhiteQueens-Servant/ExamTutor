@@ -297,12 +297,64 @@ async def generate_learn_content(req: LearnRequest) -> dict[str, Any]:
             detail=f"Learn generation failed: {type(exc).__name__}: {exc}",
         )
 
+    # 5. Save to learn history
+    from deeptutor.exam.learn_history import save_learn_content
+
+    save_result = save_learn_content(
+        knowledge_point=req.knowledge_point,
+        content=content,
+        source=source,
+        mastery_score=mastery_score,
+    )
+
     return {
         "knowledge_point": req.knowledge_point,
         "content": content,
         "source": source,
         "mastery_score": mastery_score,
+        "saved": save_result,
     }
+
+
+# ---------------------------------------------------------------------------
+# Learn history endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/learn/history")
+async def list_learn_history() -> dict[str, Any]:
+    """List all saved learning materials."""
+    from deeptutor.exam.learn_history import list_learn_history as list_history
+
+    history = list_history()
+    return {
+        "items": history,
+        "count": len(history),
+    }
+
+
+@router.get("/learn/history/{filename}")
+async def get_learn_content(filename: str) -> dict[str, Any]:
+    """Get a specific learning material by filename."""
+    from deeptutor.exam.learn_history import get_learn_content as get_content
+
+    result = get_content(filename)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Learn content not found: {filename}")
+
+    return result
+
+
+@router.delete("/learn/history/{filename}")
+async def delete_learn_content(filename: str) -> dict[str, str]:
+    """Delete a specific learning material."""
+    from deeptutor.exam.learn_history import delete_learn_content as delete_content
+
+    deleted = delete_content(filename)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"Learn content not found: {filename}")
+
+    return {"status": "deleted", "filename": filename}
 
 
 # ---------------------------------------------------------------------------
@@ -323,18 +375,13 @@ class DiagnosisGenerateRequest(BaseModel):
 
 @router.post("/diagnosis/generate")
 async def generate_diagnosis(req: DiagnosisGenerateRequest) -> list[dict[str, Any]]:
-    """Generate diagnostic assessment questions.
+    """Generate diagnostic assessment questions via single LLM call.
 
-    The LLM determines the number of questions dynamically based on
-    the exam scope and KB content. Returns a list of QuizQuestion objects.
+    Unlike generate_questions which uses the full QuestionPipeline (explore→plan→quiz),
+    diagnosis uses a lightweight single-call approach for faster response.
+    The LLM determines question count dynamically based on exam scope.
     """
-    from deeptutor.agents.question.pipeline import QuestionPipeline
-    from deeptutor.agents.question.request_config import build_question_runtime_config
-    from deeptutor.core.context import UnifiedContext
-    from deeptutor.core.stream_bus import StreamBus
-    from deeptutor.services.config import load_config_with_main
-
-    session_id = str(uuid.uuid4())
+    from deeptutor.services.llm import get_llm_client
 
     # RAG context for diagnosis
     rag_context = ""
@@ -356,75 +403,103 @@ async def generate_diagnosis(req: DiagnosisGenerateRequest) -> list[dict[str, An
         except Exception as exc:
             logger.warning("RAG search failed for diagnosis kb=%s: %s", req.kb_name, exc)
 
-    user_message = (
-        f"Please generate a diagnostic assessment for the exam: {req.exam_name}. "
-        f"Create questions that cover the core knowledge points across all major chapters/topics. "
-        f"The goal is to assess the student's current understanding level. "
-        f"Generate an appropriate number of questions (typically 10-15) to cover the key areas. "
-        f"Include a mix of difficulty levels. "
-        f"For each question, include the knowledge_point field indicating which topic it tests."
-        f"{rag_context}"
+    system_prompt = (
+        "You are an exam diagnostic assessment generator. "
+        "Generate diagnostic questions to assess a student's understanding of the exam topics. "
+        "Return a JSON array of questions. Each question must have: "
+        "question_id (string), question (string), question_type ('choice'|'short_answer'), "
+        "options (object with key-value pairs, or null for short_answer), "
+        "correct_answer (string), explanation (string), difficulty ('easy'|'medium'|'hard'), "
+        "knowledge_point (string indicating which topic it tests). "
+        "Generate exactly 5 questions covering different topics. "
+        "Return ONLY the JSON array, no other text."
     )
 
-    context = UnifiedContext(
-        session_id=session_id,
-        user_message=user_message,
-        active_capability="exam_sprint",
-        language=req.language,
+    user_prompt = (
+        f"Generate a diagnostic assessment for the exam: {req.exam_name}\n"
+        f"Cover core knowledge points across all major chapters/topics.\n"
+        f"The goal is to assess the student's current understanding level.\n"
     )
+    if rag_context:
+        user_prompt += f"\nReference material from knowledge base:\n{rag_context}\n"
+    user_prompt += "\nReturn a JSON array of diagnostic questions."
 
-    runtime_config = build_question_runtime_config(
-        base_config=load_config_with_main("main.yaml"),
-    )
-
-    pipeline = QuestionPipeline(
-        language=req.language,
-        runtime_config=runtime_config,
-    )
-
-    stream = StreamBus()
-
+    llm = get_llm_client()
     try:
-        result_payload = await pipeline.run(
-            context=context,
-            user_message=user_message,
-            num_questions=15,  # hint, LLM may generate more/fewer
-            difficulty="auto",
-            stream=stream,
+        import json as _json
+        import re as _re
+
+        raw_response = await llm.complete(
+            prompt=user_prompt,
+            system_prompt=system_prompt,
         )
+
+        logger.info("Diagnosis LLM response length: %d chars", len(raw_response or ""))
+        logger.info("Diagnosis LLM response first 500: %s", (raw_response or "")[:500])
+
+        # Extract JSON array from response
+        text = raw_response.strip()
+        if not text:
+            logger.error("Diagnosis LLM returned empty response")
+            raise ValueError("LLM returned empty response")
+
+        # Try 1: direct parse
+        try:
+            questions = _json.loads(text)
+        except _json.JSONDecodeError as e1:
+            logger.warning("JSON direct parse failed: %s", e1)
+            # Try 2: extract from markdown code block
+            code_block = _re.search(r"```(?:json)?\s*\n(.*?)```", text, _re.DOTALL)
+            if code_block:
+                text = code_block.group(1).strip()
+                try:
+                    questions = _json.loads(text)
+                except _json.JSONDecodeError as e2:
+                    logger.warning("JSON code block parse failed: %s", e2)
+                    raise ValueError(f"Could not parse JSON from code block ({len(text)} chars): {e2}")
+            else:
+                # Try 3: find the first [ ... ] array
+                arr_match = _re.search(r"\[.*\]", text, _re.DOTALL)
+                if arr_match:
+                    try:
+                        questions = _json.loads(arr_match.group())
+                    except _json.JSONDecodeError as e3:
+                        logger.warning("JSON array parse failed: %s", e3)
+                        raise ValueError(f"Could not parse extracted array ({len(arr_match.group())} chars): {e3}")
+                else:
+                    logger.error("No JSON array found in response. Full text (%d chars): %s", len(text), text[:1000])
+                    raise ValueError(f"Could not extract JSON array from response ({len(text)} chars)")
+
+        if not isinstance(questions, list):
+            raise ValueError("Response is not a JSON array")
+
+        # Normalize fields
+        normalized: list[dict[str, Any]] = []
+        for i, q in enumerate(questions):
+            if not isinstance(q, dict) or "question" not in q:
+                continue
+            normalized.append({
+                "question_id": q.get("question_id", f"diag_{i+1}"),
+                "question": q["question"],
+                "question_type": q.get("question_type", "short_answer"),
+                "options": q.get("options"),
+                "correct_answer": q.get("correct_answer", ""),
+                "explanation": q.get("explanation", ""),
+                "difficulty": q.get("difficulty", "medium"),
+                "knowledge_point": q.get("knowledge_point", ""),
+            })
+
+        if not normalized:
+            raise ValueError("No valid questions in response")
+
+        return normalized
+
     except Exception as exc:
-        logger.exception("QuestionPipeline failed for diagnosis: %s", exc)
+        logger.exception("Diagnosis generation failed: %s", exc)
         raise HTTPException(
             status_code=500,
             detail=f"Diagnosis generation failed: {type(exc).__name__}: {exc}",
         )
-
-    summary = result_payload.get("summary", {}) if isinstance(result_payload, dict) else {}
-    results = summary.get("results", []) if isinstance(summary, dict) else []
-
-    questions: list[dict[str, Any]] = []
-    for item in results:
-        qa_pair = item.get("qa_pair") if isinstance(item, dict) else None
-        if not qa_pair or not isinstance(qa_pair, dict):
-            continue
-        questions.append({
-            "question_id": qa_pair.get("question_id", ""),
-            "question": qa_pair.get("question", ""),
-            "question_type": qa_pair.get("question_type", "short_answer"),
-            "options": qa_pair.get("options"),
-            "correct_answer": qa_pair.get("correct_answer", ""),
-            "explanation": qa_pair.get("explanation", ""),
-            "difficulty": qa_pair.get("difficulty", ""),
-            "knowledge_point": qa_pair.get("concentration", qa_pair.get("knowledge_point", "")),
-        })
-
-    if not questions:
-        raise HTTPException(
-            status_code=502,
-            detail="Diagnosis pipeline returned no questions. Check LLM configuration.",
-        )
-
-    return questions
 
 
 class DiagnosisSubmitRequest(BaseModel):
@@ -509,3 +584,123 @@ async def reset_exam_state() -> dict[str, str]:
 
     reset_state()
     return {"status": "ok", "message": "All exam data has been reset"}
+
+
+# ---------------------------------------------------------------------------
+# SSE streaming diagnosis — one question at a time
+# ---------------------------------------------------------------------------
+
+
+@router.post("/diagnosis/stream")
+async def stream_diagnosis(req: DiagnosisGenerateRequest):
+    """Stream diagnostic questions one-by-one via Server-Sent Events.
+
+    Each question is generated in a separate LLM call for reliability.
+    Events:
+      - question: {index, total, question: {...}}
+      - complete: {total, message}
+      - error: {message}
+    """
+    from fastapi.responses import StreamingResponse
+    from deeptutor.services.llm import get_llm_client
+    import json as _json
+
+    total_questions = 5
+
+    async def event_generator():
+        llm = get_llm_client()
+        generated = 0
+
+        for i in range(total_questions):
+            system_prompt = (
+                "You are an exam diagnostic question generator. "
+                "Generate exactly ONE diagnostic question. "
+                "Return a JSON object (not array) with: "
+                "question_id (string), question (string), question_type ('choice'|'short_answer'), "
+                "options (object with A/B/C/D keys, or null for short_answer), "
+                "correct_answer (string), explanation (string), "
+                "difficulty ('easy'|'medium'|'hard'), knowledge_point (string). "
+                "Return ONLY the JSON object, no other text."
+            )
+
+            user_prompt = (
+                f"Generate diagnostic question {i+1}/{total_questions} for: {req.exam_name}\n"
+                f"Cover a different topic each time. Vary difficulty levels.\n"
+                "Return ONLY the JSON object."
+            )
+
+            try:
+                raw_response = await llm.complete(
+                    prompt=user_prompt,
+                    system_prompt=system_prompt,
+                )
+
+                logger.info("SSE diagnosis Q%d response length: %d", i+1, len(raw_response or ""))
+
+                text = (raw_response or "").strip()
+                if not text:
+                    logger.warning("SSE diagnosis Q%d empty response, retrying", i+1)
+                    # Retry once
+                    raw_response = await llm.complete(
+                        prompt=user_prompt + "\nIMPORTANT: Return valid JSON only.",
+                        system_prompt=system_prompt,
+                    )
+                    text = (raw_response or "").strip()
+
+                if not text:
+                    yield f"event: error\ndata: {_json.dumps({'message': f'Question {i+1} returned empty'})}\n\n"
+                    continue
+
+                # Parse JSON (try direct, then code block, then regex)
+                question = None
+                try:
+                    question = _json.loads(text)
+                except _json.JSONDecodeError:
+                    import re
+                    code_block = re.search(r"```(?:json)?\s*\n(.*?)```", text, re.DOTALL)
+                    if code_block:
+                        try:
+                            question = _json.loads(code_block.group(1).strip())
+                        except _json.JSONDecodeError:
+                            pass
+                    if question is None:
+                        obj_match = re.search(r"\{.*\}", text, re.DOTALL)
+                        if obj_match:
+                            try:
+                                question = _json.loads(obj_match.group())
+                            except _json.JSONDecodeError:
+                                pass
+
+                if not isinstance(question, dict) or "question" not in question:
+                    logger.warning("SSE diagnosis Q%d invalid format: %s", i+1, text[:200])
+                    yield f"event: error\ndata: {_json.dumps({'message': f'Question {i+1} invalid format'})}\n\n"
+                    continue
+
+                # Ensure question_id
+                if not question.get("question_id"):
+                    question["question_id"] = f"diag_{i+1}"
+
+                generated += 1
+                event_data = _json.dumps({
+                    "index": i,
+                    "total": total_questions,
+                    "question": question,
+                }, ensure_ascii=False)
+                yield f"event: question\ndata: {event_data}\n\n"
+
+            except Exception as exc:
+                logger.exception("SSE diagnosis Q%d failed: %s", i+1, exc)
+                yield f"event: error\ndata: {_json.dumps({'message': str(exc)})}\n\n"
+
+        # Signal completion
+        yield f"event: complete\ndata: {_json.dumps({'total': generated, 'message': 'Diagnosis complete'})}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

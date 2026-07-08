@@ -48,6 +48,7 @@ export default function ExamSprintPage() {
   const [learnSource, setLearnSource] = useState<"rag" | "llm" | "">("");
   const [learnLoading, setLearnLoading] = useState(false);
   const [learnError, setLearnError] = useState<string | null>(null);
+  const [learnSaved, setLearnSaved] = useState(false);
 
   // Fetch exam state + mastery on mount
   useEffect(() => {
@@ -170,6 +171,7 @@ export default function ExamSprintPage() {
         setLearnContent("");
         setLearnSource("");
         setLearnError(null);
+        setLearnSaved(false);
         setLearnLoading(true);
         setLearnOpen(true);
 
@@ -181,6 +183,7 @@ export default function ExamSprintPage() {
           });
           setLearnContent(result.content);
           setLearnSource(result.source);
+          setLearnSaved(true);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           setLearnError(msg);
@@ -262,6 +265,7 @@ export default function ExamSprintPage() {
         source={learnSource}
         loading={learnLoading}
         error={learnError}
+        saved={learnSaved}
       />
 
       {/* Setup modal (cold start) */}
