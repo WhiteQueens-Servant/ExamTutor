@@ -752,25 +752,37 @@ async def stream_diagnosis(req: DiagnosisGenerateRequest):
         for i in range(total_questions):
             system_prompt = (
                 "You are an exam diagnostic question generator. "
-                "Generate exactly ONE diagnostic question. "
-                "Return a JSON object (not array) with these EXACT fields: "
-                "question_id (string like 'CN_001'), "
-                "question (string - the question text), "
-                "question_type ('choice' for multiple choice, 'short_answer' for fill-in), "
-                "options (object with A/B/C/D keys and Chinese text values, or null for short_answer), "
-                "correct_answer (string - the correct option letter like 'A'/'B'/'C'/'D'), "
-                "explanation (string - detailed explanation in Chinese), "
-                "difficulty ('easy'|'medium'|'hard'), "
-                "knowledge_point (string - the specific topic name in Chinese like 'TCP拥塞控制' or 'IP子网划分'). "
-                "IMPORTANT: knowledge_point MUST be a non-empty Chinese string describing the topic. "
+                "Generate exactly ONE diagnostic question in Chinese. "
+                "Return a JSON object (not array) with these EXACT fields:\n"
+                "- question_id: string like 'DIAG_001'\n"
+                "- question: string (the question text in Chinese)\n"
+                "- question_type: 'choice' for multiple choice, 'short_answer' for fill-in\n"
+                "- options: object with A/B/C/D keys and Chinese text values, or null for short_answer\n"
+                "- correct_answer: string (the correct option letter like 'A'/'B'/'C'/'D')\n"
+                "- explanation: string (detailed explanation in Chinese)\n"
+                "- difficulty: 'easy'|'medium'|'hard'\n"
+                "- knowledge_point: string (REQUIRED! The specific topic name in Chinese)\n\n"
+                "CRITICAL REQUIREMENTS for knowledge_point:\n"
+                "1. MUST be a non-empty Chinese string (e.g., 'TCP拥塞控制', 'IP子网划分', 'OSI七层模型')\n"
+                "2. Must describe the CORE knowledge point being tested\n"
+                "3. Examples of valid knowledge_point values:\n"
+                "   - 'TCP三次握手'\n"
+                "   - 'IP子网划分'\n"
+                "   - 'HTTP状态码'\n"
+                "   - 'DNS域名解析'\n"
+                "   - '路由算法'\n"
+                "4. NEVER leave knowledge_point empty or as an English abbreviation\n\n"
                 "Return ONLY the JSON object, no other text."
             )
 
             user_prompt = (
-                f"Generate diagnostic question {i+1}/{total_questions} for exam: {req.exam_name}\n"
-                f"Each question must cover a DIFFERENT knowledge point (e.g., TCP, IP, subnet, routing, etc.).\n"
-                f"Vary difficulty levels across questions.\n"
-                "Return ONLY the JSON object with all required fields."
+                f"请为考试「{req.exam_name}」生成第 {i+1}/{total_questions} 道诊断题目。\n"
+                f"要求：\n"
+                f"1. 每道题必须覆盖不同的知识点\n"
+                f"2. 难度分布：easy、medium、hard 各有覆盖\n"
+                f"3. 题目类型以选择题为主\n"
+                f"4. 必须在 knowledge_point 字段填写该题考察的具体知识点名称（中文）\n"
+                f"返回格式：仅返回 JSON 对象，不要其他文字。"
             )
 
             try:
@@ -825,8 +837,15 @@ async def stream_diagnosis(req: DiagnosisGenerateRequest):
                     question["question_id"] = f"diag_{i+1}"
 
                 # Map knowledge_point to concentration for frontend compatibility
-                if question.get("knowledge_point") and not question.get("concentration"):
-                    question["concentration"] = question["knowledge_point"]
+                kp = question.get("knowledge_point", "").strip()
+                if not kp:
+                    # If LLM failed to provide knowledge_point, log warning and use question_id as fallback
+                    logger.warning("SSE diagnosis Q%d missing knowledge_point, using fallback", i+1)
+                    kp = f"知识点_{i+1}"
+                    question["knowledge_point"] = kp
+
+                if not question.get("concentration"):
+                    question["concentration"] = kp
 
                 generated += 1
                 event_data = _json.dumps({
