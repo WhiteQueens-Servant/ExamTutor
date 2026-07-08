@@ -163,6 +163,13 @@
 > 数据架构设计见 `migrate_documents/exam-sprint-data-architecture.md`。
 > V1 目标：底层性能调优（RAG 检索策略、Reranking、文档切分参数、LLM 推理速度、Prompt Engineering）。
 
+#### 当前进度（2026-07-08）
+- Phase 5.1 ✅ 数据层重构（profile.json 统一数据源）
+- Phase 5.2 ✅ 冷启动向导（SetupModal 多步骤，SSE 流式诊断）
+- Phase 5.3 ❌ 内容持久化（learn_history / practice_history / diagnosis 报告）
+- Phase 5.4 ❌ Dashboard 增强（诊断报告入口 / 错题本入口 / 学习历史入口 / 重置按钮）
+- Phase 5.5 ❌ 最终验证（完整用户旅程浏览器跑一遍）
+
 #### 5.1 数据层重构（profile.json 统一数据源）
 
 > 将 mastery.json 合并进 profile.json，建立统一的用户画像数据结构。
@@ -194,27 +201,28 @@
 - [x] 考试名称、考试日期、每日可用时间
 - [x] 写入 state.json
 
-**Step 2: 创建知识库（待实现）**
-- [ ] KB 名称输入（默认用考试名称填充）
-- [ ] 上传课程资料文档（可选，可为空）
+**Step 2: 创建知识库（已完成 ✅）**
+- [x] KB 名称输入（默认用考试名称填充）
+- [x] 上传课程资料文档（可选，可为空）
   - 复用 `createKnowledgeBase` + `uploadKnowledgeBaseFiles` API
   - 上传完成后自动索引 + 写入 state.json.kb_name
-- [ ] 跳过提示："跳过后学习材料将基于通用知识生成，建议上传课程资料以获得更精准的内容"
+- [x] 跳过提示："跳过后学习材料将基于通用知识生成，建议上传课程资料以获得更精准的内容"
 
-**Step 3: 诊断测评（待实现）**
-- [ ] 后端：`POST /diagnosis/generate` 端点
+**Step 3: 诊断测评（已完成 ✅）**
+- [x] 后端：`POST /diagnosis/generate` 端点
   - 有 KB → RAG 检索 → LLM 出题；无 KB → LLM 直接出题
   - 题数由 LLM 根据 KB 内容/考试范围动态决定（不硬编码）
-- [ ] 前端：诊断测评 Drawer（复用 QuizDrawer 样式）
-- [ ] 后端：`POST /diagnosis/submit` 端点
+- [x] 后端：`POST /diagnosis/stream` 端点（SSE 流式生成，解决超时问题）
+- [x] 前端：SSE 流式解析 + 增量渲染诊断题目
+- [x] 后端：`POST /diagnosis/submit` 端点
   - 接收作答结果 → 按知识点汇总 → 初始化 profile.json
   - 首次写入直接用原始正确率，不走 EMA
 
-**Step 4: 完成**
-- [ ] 展示诊断结果概览（分数 + 薄弱点）
-- [ ] 写入 state.json.onboarding_completed = true
+**Step 4: 完成（已完成 ✅）**
+- [x] 展示诊断结果概览（分数 + 薄弱点）
+- [x] 写入 state.json.onboarding_completed = true
 
-- [ ] ⬆ **[点停] 浏览器验证**：完整冷启动流程跑通
+- [x] ⬆ **[点停] 浏览器验证**：完整冷启动流程跑通（SSE 流式诊断 + 增量渲染）
 
 #### 5.3 内容持久化
 
@@ -286,16 +294,17 @@
 - 验证：pytest 22/22 通过，TypeScript 编译通过
 - 注意：mastery.py 保留但不再被 API 使用（向后兼容），后续可清理
 
-##### Phase 5.2 冷启动向导多步骤
-- 修改 `deeptutor/api/routers/exam_sprint.py`（新增 POST /diagnosis/generate + POST /diagnosis/submit 端点）
+##### Phase 5.2 冷启动向导多步骤（已完成）
+- 修改 `deeptutor/api/routers/exam_sprint.py`（新增 POST /diagnosis/generate + POST /diagnosis/submit + POST /diagnosis/stream 端点）
 - 重写 `web/components/exam-sprint/SetupModal.tsx`（四步向导：考试信息 → 创建KB → 诊断测评 → 完成）
 - 修改 `web/app/(workspace)/exam-sprint/page.tsx`（适配新 SetupModal onComplete 接口，诊断结果驱动 mastery）
-- 修改 `web/lib/exam-sprint-api.ts`（新增 generateDiagnosis/submitDiagnosis API + 类型定义）
+- 修改 `web/lib/exam-sprint-api.ts`（新增 generateDiagnosis/submitDiagnosis/streamDiagnosis API + 类型定义）
 - 修改 `web/components/exam-sprint/types.ts`（MasteryEntry.surface 新增 "diagnosis"）
 - 修改 `web/components/exam-sprint/ExamMasteryTable.tsx`（SURFACE_LABELS 新增 "Diagnosis"）
 - 修改 `web/locales/en/app.json` + `web/locales/zh/app.json`（新增向导步骤 i18n key）
 - 验证：浏览器端到端流程跑通 — 四步向导正确切换，诊断数据正确流入 Dashboard
-- 注意：诊断题目生成依赖 QuestionPipeline（60-120秒），首次测试因 LLM 超时需重试
+- 注意：诊断题目生成改为 SSE 流式方案（POST /diagnosis/stream），解决单次 LLM 调用生成多题 JSON 不可靠的超时问题
+- 注意：SSE 解析逻辑修复 — currentEventType 变量需在 for 循环外部声明以保持跨行状态
 - 注意：冷启动检测改为检查 `onboarding_completed` 字段
 
 （执行中遇到的问题和修改记录在此）
