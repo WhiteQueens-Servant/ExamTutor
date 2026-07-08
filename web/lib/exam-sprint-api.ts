@@ -243,6 +243,79 @@ export async function generateDiagnosis(params: {
   return await res.json();
 }
 
+/**
+ * SSE streaming diagnosis — generates questions one-by-one.
+ * Calls callback for each question as it arrives.
+ * Returns when all questions are generated or error occurs.
+ */
+export async function streamDiagnosis(params: {
+  exam_name: string;
+  kb_name?: string;
+  language?: string;
+  onQuestion: (question: QuizQuestion, index: number, total: number) => void;
+  onError: (message: string) => void;
+  onComplete: (total: number) => void;
+}): Promise<void> {
+  const res = await fetch(apiUrl("/api/v1/exam-sprint/diagnosis/stream"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      exam_name: params.exam_name,
+      kb_name: params.kb_name ?? "",
+      language: params.language ?? "zh",
+    }),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`Diagnosis stream failed (${res.status}): ${detail}`);
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("No response body");
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let currentEventType = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+
+    // Process SSE events
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || ""; // Keep incomplete line in buffer
+
+    for (const line of lines) {
+      if (line.startsWith("event: ")) {
+        // Store event type, will be used when we find the data line
+        currentEventType = line.slice(7).trim();
+      } else if (line.startsWith("data: ")) {
+        const eventData = line.slice(6);
+        // When we have both event type and data, process the event
+        if (currentEventType) {
+          try {
+            const parsed = JSON.parse(eventData);
+
+            if (currentEventType === "question") {
+              params.onQuestion(parsed.question, parsed.index, parsed.total);
+            } else if (currentEventType === "complete") {
+              params.onComplete(parsed.total);
+            } else if (currentEventType === "error") {
+              params.onError(parsed.message);
+            }
+          } catch (e) {
+            console.error("Failed to parse SSE data:", e);
+          }
+          currentEventType = "";
+        }
+      }
+    }
+  }
+}
+
 export interface DiagnosisSubmitResult {
   status: string;
   overall_score: number;
