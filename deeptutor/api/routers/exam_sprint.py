@@ -564,6 +564,30 @@ async def submit_diagnosis(req: DiagnosisSubmitRequest) -> dict[str, Any]:
             save_wrong_question(a, source="diagnosis")
             wrong_count += 1
 
+    # Auto-generate task list after diagnosis
+    from deeptutor.exam.tasks import generate_tasks_from_diagnosis, save_tasks
+    from deeptutor.exam.state import load_state
+    from datetime import datetime, timezone
+
+    tasks_data = {"tasks": [], "total_tasks": 0, "completed_tasks": 0}
+    try:
+        state = load_state()
+        exam_date = state.get("exam_date", "")
+        if exam_date:
+            exam_dt = datetime.fromisoformat(exam_date.replace("Z", "+00:00"))
+            now = datetime.now(timezone.utc)
+            days_remaining = max(1, (exam_dt - now).days)
+            daily_hours = state.get("daily_budget_minutes", 120) / 60
+
+            tasks_data = generate_tasks_from_diagnosis(
+                knowledge_points=profile.get("knowledge_points", []),
+                days_remaining=days_remaining,
+                daily_hours=daily_hours,
+            )
+            save_tasks(tasks_data)
+    except Exception as e:
+        logger.warning("Failed to generate tasks after diagnosis: %s", e)
+
     return {
         "status": "ok",
         "overall_score": overall_score,
@@ -573,6 +597,7 @@ async def submit_diagnosis(req: DiagnosisSubmitRequest) -> dict[str, Any]:
         "weak_points": weak_points,
         "strong_points": strong_points,
         "knowledge_points": profile.get("knowledge_points", []),
+        "tasks_generated": tasks_data.get("total_tasks", 0),
     }
 
 
@@ -614,13 +639,89 @@ async def get_diagnosis_report() -> dict[str, Any]:
 async def reset_exam_state() -> dict[str, str]:
     """Reset all exam state to defaults.
 
-    Deletes: state.json, profile.json, learn_history/, practice_history.json.
+    Deletes: state.json, profile.json, learn_history/, practice_history.json, tasks.json.
     Requires user confirmation on the frontend before calling.
     """
     from deeptutor.exam.state import reset_state
+    from deeptutor.exam.tasks import reset_tasks
 
     reset_state()
+    reset_tasks()
     return {"status": "ok", "message": "All exam data has been reset"}
+
+
+# ---------------------------------------------------------------------------
+# Task list endpoints — daily tasks generated from weak points
+# ---------------------------------------------------------------------------
+
+
+@router.get("/tasks")
+async def get_tasks() -> dict[str, Any]:
+    """Get today's task list.
+
+    Returns tasks generated from diagnosis weak points + time pressure.
+    If no tasks exist, returns empty list.
+    """
+    from deeptutor.exam.tasks import load_tasks
+
+    return load_tasks()
+
+
+@router.post("/task/complete")
+async def complete_task_endpoint(task_id: str) -> dict[str, Any]:
+    """Mark a task as completed.
+
+    Updates task status and returns the updated task list.
+    """
+    from deeptutor.exam.tasks import complete_task
+
+    result = complete_task(task_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Task not found: {task_id}")
+    return result
+
+
+@router.post("/task/generate")
+async def generate_tasks_endpoint() -> dict[str, Any]:
+    """Generate initial task list from diagnosis knowledge points.
+
+    Called after cold start diagnosis completes.
+    Uses PlanBuilder logic to create prioritized tasks.
+    """
+    from deeptutor.exam.tasks import generate_tasks_from_diagnosis, save_tasks
+    from deeptutor.exam.profile import load_profile
+    from deeptutor.exam.state import load_state
+
+    profile = load_profile()
+    state = load_state()
+
+    knowledge_points = profile.get("knowledge_points", [])
+    if not knowledge_points:
+        raise HTTPException(status_code=400, detail="No knowledge points found. Complete diagnosis first.")
+
+    exam_date = state.get("exam_date", "")
+    if not exam_date:
+        raise HTTPException(status_code=400, detail="No exam date set.")
+
+    # Calculate days remaining
+    from datetime import datetime, timezone
+    try:
+        exam_dt = datetime.fromisoformat(exam_date.replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        days_remaining = max(1, (exam_dt - now).days)
+    except Exception:
+        days_remaining = 14  # fallback
+
+    daily_hours = state.get("daily_budget_minutes", 120) / 60
+
+    tasks_data = generate_tasks_from_diagnosis(
+        knowledge_points=knowledge_points,
+        days_remaining=days_remaining,
+        daily_hours=daily_hours,
+    )
+    save_tasks(tasks_data)
+
+    return tasks_data
 
 
 # ---------------------------------------------------------------------------

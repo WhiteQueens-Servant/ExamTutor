@@ -103,6 +103,73 @@ export async function saveExamState(params: {
 }
 
 // ---------------------------------------------------------------------------
+// Tasks — daily tasks generated from weak points
+// ---------------------------------------------------------------------------
+
+export interface SprintTask {
+  id: string;
+  knowledge_point: string;
+  action: "learn" | "practice";
+  priority: "critical" | "high" | "medium" | "low";
+  estimated_minutes: number;
+  current_score: number;
+  gap: number;
+  completed: boolean;
+  completed_at: string | null;
+}
+
+export interface TaskListResponse {
+  tasks: SprintTask[];
+  generated_at: string;
+  date: string;
+  total_tasks: number;
+  completed_tasks: number;
+}
+
+/**
+ * Fetch today's task list.
+ */
+export async function fetchTasks(): Promise<TaskListResponse> {
+  const res = await apiFetch(apiUrl("/api/v1/exam-sprint/tasks"));
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`Failed to fetch tasks (${res.status}): ${detail}`);
+  }
+  return await res.json();
+}
+
+/**
+ * Mark a task as completed.
+ */
+export async function completeTask(taskId: string): Promise<TaskListResponse> {
+  const res = await apiFetch(
+    apiUrl(`/api/v1/exam-sprint/task/complete?task_id=${encodeURIComponent(taskId)}`),
+    { method: "POST" },
+  );
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`Failed to complete task (${res.status}): ${detail}`);
+  }
+  return await res.json();
+}
+
+/**
+ * Generate initial task list from diagnosis knowledge points.
+ * Called after cold start diagnosis completes.
+ */
+export async function generateTasks(): Promise<TaskListResponse> {
+  const res = await apiFetch(
+    apiUrl("/api/v1/exam-sprint/task/generate"),
+    { method: "POST" },
+  );
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`Failed to generate tasks (${res.status}): ${detail}`);
+  }
+  return await res.json();
+}
+
+// ---------------------------------------------------------------------------
 // Learn content generation
 // ---------------------------------------------------------------------------
 

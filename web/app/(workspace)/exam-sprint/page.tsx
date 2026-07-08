@@ -13,10 +13,7 @@ import { SetupModal } from "@/components/exam-sprint/SetupModal";
 import { SprintTaskList } from "@/components/exam-sprint/SprintTaskList";
 import { StatCards } from "@/components/exam-sprint/StatCards";
 import { TopWeakBanner } from "@/components/exam-sprint/TopWeakBanner";
-import {
-  MOCK_TASKS,
-} from "@/components/exam-sprint/types";
-import type { MasteryEntry, SprintTask } from "@/components/exam-sprint/types";
+import type { MasteryEntry } from "@/components/exam-sprint/types";
 import type { QuizQuestion } from "@/lib/quiz-types";
 import {
   fetchExamState,
@@ -25,8 +22,12 @@ import {
   generateLearnContent,
   saveLearnContent,
   saveWrongQuestionsBatch,
+  fetchTasks,
+  completeTask,
   type ExamState,
   type DiagnosisSubmitResult,
+  type SprintTask,
+  type TaskListResponse,
 } from "@/lib/exam-sprint-api";
 import type { QuizAnswerRecord } from "@/components/exam-sprint/QuizDrawer";
 import { fetchMastery } from "@/lib/exam-sprint-mastery-api";
@@ -38,6 +39,7 @@ export default function ExamSprintPage() {
   const [selectedKb, setSelectedKb] = useState("");
   const [mastery, setMastery] = useState<MasteryEntry[]>([]);
   const [examState, setExamState] = useState<ExamState | null>(null);
+  const [taskList, setTaskList] = useState<TaskListResponse | null>(null);
   const [setupOpen, setSetupOpen] = useState(false);
   const [setupLoading, setSetupLoading] = useState(false);
   const [setupError, setSetupError] = useState<string | null>(null);
@@ -61,7 +63,10 @@ export default function ExamSprintPage() {
   const [practiceHistoryOpen, setPracticeHistoryOpen] = useState(false);
   const [diagnosisReportOpen, setDiagnosisReportOpen] = useState(false);
 
-  // Fetch exam state + mastery on mount
+  // Track current task for completion
+  const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+
+  // Fetch exam state + mastery + tasks on mount
   useEffect(() => {
     fetchExamState()
       .then((state) => {
@@ -81,9 +86,15 @@ export default function ExamSprintPage() {
       .catch((err) => {
         console.error("Failed to load mastery:", err);
       });
+
+    fetchTasks()
+      .then(setTaskList)
+      .catch((err) => {
+        console.error("Failed to load tasks:", err);
+      });
   }, []);
 
-  // Compute meta from exam state (fallback to MOCK_META)
+  // Compute meta from exam state + task list
   const meta = useMemo(() => {
     if (!examState || !examState.exam_name) {
       return {
@@ -102,16 +113,21 @@ export default function ExamSprintPage() {
     let phase: "phase_planning" | "sprint_week" | "score_protection" = "phase_planning";
     if (daysRemaining <= 3) phase = "score_protection";
     else if (daysRemaining <= 13) phase = "sprint_week";
+
+    // Use real task data from API
+    const totalTasks = taskList?.total_tasks ?? 0;
+    const completedTasks = taskList?.completed_tasks ?? 0;
+
     return {
       exam_name: examState.exam_name,
       exam_date: examState.exam_date,
       days_remaining: daysRemaining,
       phase,
       streak: examState.streak,
-      total_tasks_today: examState.total_tasks_today,
-      completed_tasks_today: examState.completed_tasks_today,
+      total_tasks_today: totalTasks,
+      completed_tasks_today: completedTasks,
     };
-  }, [examState]);
+  }, [examState, taskList]);
 
   // Setup handler
   const handleSetup = useCallback(async (data: {
@@ -154,6 +170,9 @@ export default function ExamSprintPage() {
 
   const handleTaskAction = useCallback(
     async (task: SprintTask, action: "learn" | "practice") => {
+      // Track current task for completion
+      setCurrentTaskId(task.id);
+
       if (action === "practice") {
         setDrawerTitle(`${task.knowledge_point} — ${t("Practice")}`);
         setDrawerQuestions([]);
@@ -224,17 +243,31 @@ export default function ExamSprintPage() {
 
   // Auto-save wrong questions when quiz completes
   const handleQuizComplete = useCallback(async (wrongAnswers: QuizAnswerRecord[]) => {
-    if (wrongAnswers.length === 0) return;
-    try {
-      await saveWrongQuestionsBatch({
-        questions: wrongAnswers,
-        source: "practice",
-      });
-      console.log(`Auto-saved ${wrongAnswers.length} wrong questions to practice history`);
-    } catch (err) {
-      console.error("Failed to auto-save wrong questions:", err);
+    // Save wrong questions to practice history
+    if (wrongAnswers.length > 0) {
+      try {
+        await saveWrongQuestionsBatch({
+          questions: wrongAnswers,
+          source: "practice",
+        });
+        console.log(`Auto-saved ${wrongAnswers.length} wrong questions to practice history`);
+      } catch (err) {
+        console.error("Failed to auto-save wrong questions:", err);
+      }
     }
-  }, []);
+
+    // Mark task as completed
+    if (currentTaskId) {
+      try {
+        const updatedTasks = await completeTask(currentTaskId);
+        setTaskList(updatedTasks);
+        setCurrentTaskId(null);
+        console.log(`Task ${currentTaskId} marked as completed`);
+      } catch (err) {
+        console.error("Failed to complete task:", err);
+      }
+    }
+  }, [currentTaskId]);
 
   return (
     <div className="flex h-full min-h-full flex-col overflow-hidden bg-[var(--background)]">
@@ -308,7 +341,7 @@ export default function ExamSprintPage() {
           </div>
 
           {/* Task list */}
-          <SprintTaskList tasks={MOCK_TASKS} onAction={handleTaskAction} />
+          <SprintTaskList tasks={taskList?.tasks ?? []} onAction={handleTaskAction} />
 
           {/* Mastery table */}
           <ExamMasteryTable data={mastery} />
