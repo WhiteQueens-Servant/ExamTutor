@@ -9,11 +9,9 @@ import {
   BookOpen,
   Bot,
   BookText,
-  Brain,
   ChevronDown,
   Github,
   LayoutGrid,
-  Library,
   MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
@@ -54,7 +52,6 @@ const PRIMARY_NAV: NavEntry[] = [
     icon: PenLine,
     tooltipKey: "Co-Writer tooltip",
   },
-  { href: "/book", label: "Book", icon: Library, tooltipKey: "Book tooltip" },
   {
     href: "/knowledge",
     label: "Knowledge",
@@ -66,12 +63,6 @@ const PRIMARY_NAV: NavEntry[] = [
     label: "Space",
     icon: LayoutGrid,
     tooltipKey: "Space tooltip",
-  },
-  {
-    href: "/memory",
-    label: "Memory",
-    icon: Brain,
-    tooltipKey: "Memory tooltip",
   },
   {
     href: "/exam-sprint",
