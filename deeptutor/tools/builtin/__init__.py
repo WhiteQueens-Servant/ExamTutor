@@ -1107,6 +1107,87 @@ class AskUserTool(_PromptHintsMixin, BaseTool):
         )
 
 
+class VideoUnderstandTool(_PromptHintsMixin, BaseTool):
+    """Understand video content by extracting key frames + transcribing speech,
+    then analysing them with a multimodal LLM.
+
+    Architecture (consensus, see
+    docs/superpowers/specs/2026-07-22-video-understand-tool-design.md):
+
+    * The tool internally invokes claude-real-video to pull key frames +
+      a Whisper transcript, then feeds both to a configurable multimodal LLM.
+    * The multimodal LLM returns a natural-language + JSON analysis; that
+      text becomes the tool result consumed by the calling Agent_Loop.
+    * Tool messages are text-only (tool_dispatch packs content into a
+      ``role=tool`` string), so images are never returned to the caller —
+      they live and die inside this tool's multimodal call.
+
+    This skeleton wires the tool into the registry with an empty ``execute``
+    so we can verify registration + prompt-hint rendering before building
+    the real pipeline. Subsequent tasks fill in: claude-real-video
+    extraction, multimodal analysis, and temp-file management.
+    """
+
+    def get_definition(self) -> ToolDefinition:
+        return ToolDefinition(
+            name="video_understand",
+            description=(
+                "Understand a video's content: extract key frames and "
+                "transcribe speech, then analyse them together with a "
+                "multimodal LLM (corrects transcription term errors from "
+                "the on-screen text). Use when the user uploads a video or "
+                "asks to understand / summarise / analyse a video."
+            ),
+            parameters=[
+                ToolParameter(
+                    name="video_path",
+                    type="string",
+                    description="Path to the video file to understand.",
+                ),
+                ToolParameter(
+                    name="language",
+                    type="string",
+                    description="Transcription language hint (default 'zh').",
+                    required=False,
+                    default="zh",
+                ),
+                ToolParameter(
+                    name="max_frames",
+                    type="integer",
+                    description="Maximum number of key frames to extract (default 72).",
+                    required=False,
+                    default=72,
+                ),
+                ToolParameter(
+                    name="analysis_prompt",
+                    type="string",
+                    description="Optional custom analysis prompt.",
+                    required=False,
+                ),
+            ],
+        )
+
+    async def execute(self, **kwargs: Any) -> ToolResult:
+        # Skeleton placeholder. Real pipeline (claude-real-video extraction +
+        # multimodal LLM analysis) is filled in by subsequent tasks.
+        video_path = str(kwargs.get("video_path") or "").strip()
+        if not video_path:
+            return ToolResult(
+                content="Error: video_path is required.",
+                success=False,
+            )
+        return ToolResult(
+            content=(
+                f"[video_understand skeleton] Would analyse {video_path!r}. "
+                "Extraction + multimodal analysis not implemented yet."
+            ),
+            metadata={
+                "video_path": video_path,
+                "skeleton": True,
+            },
+        )
+
+
 BUILTIN_TOOL_TYPES: tuple[type[BaseTool], ...] = (
     BrainstormTool,
     RAGTool,
@@ -1122,6 +1203,7 @@ BUILTIN_TOOL_TYPES: tuple[type[BaseTool], ...] = (
     WriteNoteTool,
     GithubTool,
     AskUserTool,
+    VideoUnderstandTool,
     TimePressureTool,
     WeakPointRankerTool,
     PlanBuilderTool,
@@ -1183,4 +1265,5 @@ __all__ = [
     "WebSearchTool",
     "WriteMemoryTool",
     "WriteNoteTool",
+    "VideoUnderstandTool",
 ]

@@ -1,0 +1,6 @@
+short_description: "Understand a video: extract key frames, transcribe speech, then analyse both with a multimodal LLM."
+when_to_use: "Use when the user uploads a video or asks to understand / summarise / analyse a video. On-screen text is used to correct homophone errors in the speech transcript."
+input_format: "{\"video_path\": \"path to the video\", \"language\": \"transcription language (default 'zh')\", \"max_frames\": \"max key frames (default 72)\", \"analysis_prompt\": \"optional custom analysis prompt\"}."
+guideline: "Reach for this tool first for any video-related question. It returns a structured content analysis (topic, chapter breakdown, key concepts, term corrections) that you build on to answer."
+note: "Processing a video takes time — longer for large files. Temp artifacts are kept for debugging."
+phase: "exploration"
