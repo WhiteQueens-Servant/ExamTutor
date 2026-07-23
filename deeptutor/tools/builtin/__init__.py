@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
+import os
 from typing import Any
 
 from deeptutor.core.tool_protocol import BaseTool, ToolDefinition, ToolParameter, ToolResult
@@ -1108,27 +1110,26 @@ class AskUserTool(_PromptHintsMixin, BaseTool):
 
 
 class VideoUnderstandTool(_PromptHintsMixin, BaseTool):
-    """Understand video content by extracting key frames + transcribing speech,
-    then analysing them with a multimodal LLM.
+    """视频理解工具：提取关键帧 + 转录语音，再用多模态 LLM 图文结合分析。
 
-    Architecture (consensus, see
-    docs/superpowers/specs/2026-07-22-video-understand-tool-design.md):
+    架构共识（详见 docs/superpowers/specs/2026-07-22-video-understand-tool-design.md）：
 
-    * The tool internally invokes claude-real-video to pull key frames +
-      a Whisper transcript, then feeds both to a configurable multimodal LLM.
-    * The multimodal LLM returns a natural-language + JSON analysis; that
-      text becomes the tool result consumed by the calling Agent_Loop.
-    * Tool messages are text-only (tool_dispatch packs content into a
-      ``role=tool`` string), so images are never returned to the caller —
-      they live and die inside this tool's multimodal call.
+    * 工具内部调用 claude-real-video 抽取关键帧 + Whisper 转录文本，
+      再把两者喂给可配置的多模态 LLM。
+    * 多模态 LLM 返回「自然语言 + JSON」分析结果，这段文本就是
+      调用方 Agent_Loop 消费的 ToolResult.content。
+    * tool 消息体是纯文本（tool_dispatch 把 content 塞进 role=tool 的
+      字符串），因此图片永远不会回传给调用方——它们只在本工具内部的
+      多模态调用里存活。
 
-    This skeleton wires the tool into the registry with an empty ``execute``
-    so we can verify registration + prompt-hint rendering before building
-    the real pipeline. Subsequent tasks fill in: claude-real-video
-    extraction, multimodal analysis, and temp-file management.
+    本骨架阶段只把工具挂进注册表、execute 留空，目的是先验证注册 +
+    prompt-hint 渲染。真实管线（claude-real-video 抽取、多模态分析、
+    临时文件管理）由后续任务填充。
     """
 
     def get_definition(self) -> ToolDefinition:
+        # schema 的 description 面向 LLM function-calling，保持英文以与
+        # 项目其他内置工具一致（zh/en 细化引导放在 hints YAML）。
         return ToolDefinition(
             name="video_understand",
             description=(
@@ -1168,22 +1169,103 @@ class VideoUnderstandTool(_PromptHintsMixin, BaseTool):
         )
 
     async def execute(self, **kwargs: Any) -> ToolResult:
-        # Skeleton placeholder. Real pipeline (claude-real-video extraction +
-        # multimodal LLM analysis) is filled in by subsequent tasks.
+        # —— 参数解析（language/max_frames 有默认值，video_path 必填）——
         video_path = str(kwargs.get("video_path") or "").strip()
         if not video_path:
+            # 缺少必填的视频路径，直接返回失败。
             return ToolResult(
                 content="Error: video_path is required.",
                 success=False,
             )
+        language = str(kwargs.get("language") or "zh").strip() or "zh"
+        try:
+            max_frames = int(kwargs.get("max_frames") or 72)
+        except (TypeError, ValueError):
+            max_frames = 72
+
+        # —— 临时目录：基于视频绝对路径的哈希（任务2 策略）——
+        # 任务4 会升级为会话级 {session_id}/（需改 chat pipeline 注入 session_id）。
+        # 延迟 import get_runtime_data_root：顶端 import 会触发
+        # runtime.__init__ → orchestrator → tool_registry → tools.builtin 的循环导入。
+        from deeptutor.runtime.home import get_runtime_data_root
+
+        abs_path = os.path.abspath(video_path)
+        path_hash = hashlib.md5(abs_path.encode("utf-8")).hexdigest()[:12]
+        out_dir = str(get_runtime_data_root() / "temp" / "video_understand" / path_hash)
+
+        # —— 延迟 import：claude_real_video 是可选外部依赖 ——
+        # 放顶端会导致未安装时整个 tools 模块 import 失败（连带 rag/web_search 全挂），
+        # 故按"可选依赖"豁免条款放在函数内部，未安装时本工具优雅降级。
+        try:
+            from claude_real_video import process
+        except ImportError as exc:
+            return ToolResult(
+                content=f"claude-real-video 未安装，无法处理视频：{exc}",
+                success=False,
+                metadata={"video_path": video_path, "error": "missing_dependency"},
+            )
+
+        # —— 调用 process()：同步阻塞函数（内部 subprocess），用 to_thread 不阻塞事件循环 ——
+        try:
+            result = await asyncio.to_thread(
+                process,
+                src=video_path,
+                out_dir=out_dir,
+                max_frames=max_frames,
+                lang=language,
+                do_transcribe=True,
+                overwrite=True,
+            )
+        except Exception as exc:
+            # 缺少 ffmpeg/whisper、视频损坏等情况都会在这里抛出，统一降级不崩溃。
+            logger.exception("video_understand 提取失败")
+            return ToolResult(
+                content=f"视频处理失败：{exc}",
+                success=False,
+                metadata={"video_path": video_path, "out_dir": out_dir, "error": str(exc)},
+            )
+
+        # —— 删除 process() 复制的源视频副本，节省磁盘（用户持有原始文件）——
+        source_copy = os.path.join(result.out_dir, "source.mp4")
+        if os.path.exists(source_copy):
+            try:
+                os.remove(source_copy)
+            except OSError:
+                logger.warning("无法删除源视频副本：%s", source_copy)
+
+        # —— 读取转录文本，拼装 content ——
+        # 任务2 只做提取；任务3 会用多模态 LLM 分析关键帧，替换这段 content。
+        transcript_text = ""
+        if result.transcript_path and os.path.exists(result.transcript_path):
+            try:
+                with open(result.transcript_path, encoding="utf-8") as f:
+                    transcript_text = f.read().strip()
+            except OSError:
+                logger.warning("无法读取转录文件：%s", result.transcript_path)
+
+        content_parts: list[str] = [
+            "[video_understand] 提取完成",
+            f"- 时长：{result.duration}秒 | 关键帧：{result.frame_count}张",
+            f"- 产物目录：{result.out_dir}",
+        ]
+        if transcript_text:
+            content_parts.append(
+                f"\n--- 转录文本（{len(transcript_text)}字符）---\n{transcript_text}"
+            )
+        else:
+            content_parts.append("\n（无转录文本——视频可能无音轨，或 whisper 未安装）")
+
         return ToolResult(
-            content=(
-                f"[video_understand skeleton] Would analyse {video_path!r}. "
-                "Extraction + multimodal analysis not implemented yet."
-            ),
+            content="\n".join(content_parts),
             metadata={
                 "video_path": video_path,
-                "skeleton": True,
+                "out_dir": result.out_dir,
+                "frames_dir": result.frames_dir,
+                "frame_count": result.frame_count,
+                "duration": result.duration,
+                "transcript_path": result.transcript_path,
+                "frames_json_path": result.frames_json_path,
+                "has_transcript": bool(transcript_text),
             },
         )
 
