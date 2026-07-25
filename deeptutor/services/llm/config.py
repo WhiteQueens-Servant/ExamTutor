@@ -16,7 +16,10 @@ from pathlib import Path
 import re
 from typing import TYPE_CHECKING, TypedDict
 
-from deeptutor.services.config import resolve_llm_runtime_config
+from deeptutor.services.config import (
+    resolve_llm_runtime_config,
+    resolve_multimodal_runtime_config,
+)
 from deeptutor.services.provider_registry import canonical_provider_name, find_by_name
 
 from .exceptions import LLMConfigError
@@ -208,6 +211,42 @@ def get_llm_config() -> LLMConfig:
     return _LLM_CONFIG_CACHE
 
 
+def get_multimodal_llm_config() -> LLMConfig:
+    """加载多模态（vision）LLM 配置，供 VideoUnderstandTool 等需要视觉理解的场景使用。
+
+    与 get_llm_config 平行，但从 catalog 的 'multimodal' service 读取（独立于
+    主 LLM 配置，互不影响）。未配置多模态模型时抛 LLMConfigError——不 fallback
+    到主 LLM，避免误用不支持视觉的模型导致图片被静默 strip。
+
+    不走全局缓存 / scoped 机制：多模态配置使用频率低，且不需要请求级覆盖。
+    """
+    resolved = resolve_multimodal_runtime_config()
+    if not resolved.model:
+        raise LLMConfigError(
+            "No multimodal (vision) model is configured. "
+            "Please add a 'multimodal' service in Settings > Catalog "
+            "(data/user/settings/model_catalog.json)."
+        )
+    if not resolved.effective_url and resolved.provider_mode != "oauth":
+        raise LLMConfigError(
+            "No effective multimodal LLM endpoint resolved. "
+            "Please configure base_url for the 'multimodal' service."
+        )
+    return LLMConfig(
+        model=resolved.model,
+        api_key=resolved.api_key,
+        base_url=resolved.base_url,
+        effective_url=resolved.effective_url,
+        binding=resolved.binding,
+        provider_name=resolved.provider_name,
+        provider_mode=resolved.provider_mode,
+        api_version=resolved.api_version,
+        extra_headers=resolved.extra_headers,
+        reasoning_effort=resolved.reasoning_effort,
+        context_window=resolved.context_window,
+    )
+
+
 async def get_llm_config_async() -> LLMConfig:
     """
     Async wrapper for get_llm_config.
@@ -286,6 +325,7 @@ __all__ = [
     "LLMConfig",
     "get_llm_config",
     "get_llm_config_async",
+    "get_multimodal_llm_config",
     "clear_llm_config_cache",
     "reload_config",
     "uses_max_completion_tokens",

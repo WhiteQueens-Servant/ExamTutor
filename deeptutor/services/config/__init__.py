@@ -50,6 +50,7 @@ __all__ = [
     "ResolvedEmbeddingConfig",
     "ResolvedSearchConfig",
     "resolve_llm_runtime_config",
+    "resolve_multimodal_runtime_config",
     "resolve_embedding_runtime_config",
     "resolve_search_runtime_config",
     "search_provider_state",
@@ -85,6 +86,7 @@ def __getattr__(name: str):
         "ResolvedSearchConfig",
         "resolve_embedding_runtime_config",
         "resolve_llm_runtime_config",
+        "resolve_multimodal_runtime_config",
         "resolve_search_runtime_config",
         "search_provider_state",
     }:

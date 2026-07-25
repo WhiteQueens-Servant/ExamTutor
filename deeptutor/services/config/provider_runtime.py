@@ -435,6 +435,72 @@ def resolve_llm_runtime_config(
     )
 
 
+def resolve_multimodal_runtime_config(
+    catalog: dict[str, Any] | None = None,
+    *,
+    service: ModelCatalogService | None = None,
+) -> ResolvedLLMConfig:
+    """解析多模态（vision）LLM 配置：从 catalog 的 'multimodal' service 读取。
+
+    与 resolve_llm_runtime_config 平行，但服务名是 'multimodal'，供
+    VideoUnderstandTool 等需要 vision 模型的场景使用。未配置时 model
+    留空（不 fallback 默认模型），由 get_multimodal_llm_config 抛错，
+    避免误用不支持视觉的主 LLM。
+    """
+    catalog_service = service or get_model_catalog_service()
+    loaded = _load_catalog(catalog)
+    profile, model = _active_profile_and_model(loaded, catalog_service, "multimodal")
+
+    resolved_model = _as_str((model or {}).get("model"))
+    # 注意：不 fallback 默认模型——多模态模型必须显式配置，否则下游报错
+
+    binding_hint_raw = _as_str((profile or {}).get("binding"))
+    binding_hint = canonical_provider_name(binding_hint_raw)
+
+    active_api_key = _as_str((profile or {}).get("api_key"))
+    active_api_base = _as_str((profile or {}).get("base_url"))
+    active_api_version = _as_str((profile or {}).get("api_version"))
+    reasoning_effort = _as_str((model or {}).get("reasoning_effort")) or None
+    active_extra_headers = _to_headers((profile or {}).get("extra_headers"))
+    context_window = _coerce_optional_int((model or {}).get("context_window"))
+    if context_window is None:
+        context_window = _coerce_optional_int((model or {}).get("context_window_tokens"))
+
+    provider_pool = _collect_provider_pool(loaded)
+    spec = _choose_resolved_provider(
+        hint=binding_hint,
+        model=resolved_model,
+        api_key=active_api_key,
+        api_base=active_api_base or None,
+        provider_pool=provider_pool,
+    )
+
+    mapped = provider_pool.get(spec.name)
+    api_key = active_api_key or (mapped.api_key if mapped else "")
+    api_base = active_api_base or ((mapped.api_base or "") if mapped else "")
+    api_version = active_api_version or ((mapped.api_version or "") if mapped else "")
+    if not api_base and spec.default_api_base:
+        api_base = spec.default_api_base
+    if not api_key and spec.is_local:
+        api_key = "sk-no-key-required"
+    extra_headers = active_extra_headers or ((mapped.extra_headers or {}) if mapped else {})
+
+    return ResolvedLLMConfig(
+        model=resolved_model,
+        provider_name=spec.name,
+        provider_mode=spec.mode,
+        binding_hint=binding_hint,
+        binding=spec.name,
+        api_key=api_key,
+        base_url=api_base or None,
+        effective_url=api_base or None,
+        api_version=api_version or None,
+        extra_headers=extra_headers,
+        reasoning_effort=reasoning_effort,
+        context_window=context_window,
+    )
+
+
 def _canonical_embedding_provider_name(name: str | None) -> str | None:
     if not name:
         return None
