@@ -38,6 +38,7 @@ def _default_catalog() -> dict[str, Any]:
             "llm": _service_shell(),
             "embedding": _service_shell(),
             "search": _search_shell(),
+            "multimodal": _service_shell(),
         },
     }
 
@@ -101,7 +102,8 @@ class ModelCatalogService:
         services.setdefault("llm", _service_shell())
         services.setdefault("embedding", _service_shell())
         services.setdefault("search", _search_shell())
-        for service_name in ("llm", "embedding", "search"):
+        services.setdefault("multimodal", _service_shell())
+        for service_name in ("llm", "embedding", "search", "multimodal"):
             service = services[service_name]
             profiles = service.setdefault("profiles", [])
             for profile in profiles:
@@ -144,7 +146,7 @@ class ModelCatalogService:
             if profiles and service.get("active_profile_id") not in profile_ids:
                 service["active_profile_id"] = profiles[0]["id"]
                 changed = True
-            if service_name in {"llm", "embedding"}:
+            if service_name in {"llm", "embedding", "multimodal"}:
                 active_profile = self.get_active_profile(catalog, service_name)
                 models = (active_profile or {}).get("models") or []
                 model_ids = {model.get("id") for model in models}
