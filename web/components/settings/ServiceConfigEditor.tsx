@@ -39,6 +39,7 @@ const SERVICE_LABEL: Record<ServiceName, string> = {
   llm: "LLM",
   embedding: "Embedding",
   search: "Search",
+  multimodal: "Multimodal",
 };
 
 export function ServiceConfigEditor({ service }: { service: ServiceName }) {
@@ -352,7 +353,7 @@ export function ServiceConfigEditor({ service }: { service: ServiceName }) {
                         (model.name || "").trim() ||
                         defaultModelLabel(language, index + 1);
                       const metric =
-                        service === "llm"
+                        service === "llm" || service === "multimodal"
                           ? formatCompactTokens(model.context_window)
                           : formatDimensionBadge(model.dimension);
                       return (
@@ -431,7 +432,7 @@ export function ServiceConfigEditor({ service }: { service: ServiceName }) {
                         placeholder="gpt-4o"
                       />
                     </div>
-                    {service === "llm" && (
+                    {(service === "llm" || service === "multimodal") && (
                       <>
                         <div>
                           <div className="mb-1.5 text-[12px] text-[var(--muted-foreground)]">
@@ -448,11 +449,13 @@ export function ServiceConfigEditor({ service }: { service: ServiceName }) {
                           />
                           <ContextWindowMeta model={activeModel} />
                         </div>
-                        <ContextWindowDetectionBanner
-                          model={activeModel}
-                          detection={activeLlmDetection}
-                          onApply={applyDetectedContextWindow}
-                        />
+                        {service === "llm" && (
+                          <ContextWindowDetectionBanner
+                            model={activeModel}
+                            detection={activeLlmDetection}
+                            onApply={applyDetectedContextWindow}
+                          />
+                        )}
                       </>
                     )}
                     {service === "embedding" && (

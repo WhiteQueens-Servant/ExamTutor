@@ -234,7 +234,7 @@ def _provider_choices() -> dict[str, list[dict[str, str]]]:
         {"value": "perplexity", "label": "Perplexity", "base_url": ""},
         {"value": "serper", "label": "Serper", "base_url": ""},
     ]
-    return {"llm": llm, "embedding": embedding, "search": search}
+    return {"llm": llm, "embedding": embedding, "search": search, "multimodal": llm}
 
 
 def _api_base_source(system: dict[str, Any]) -> str:

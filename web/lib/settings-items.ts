@@ -5,6 +5,7 @@ import {
   BookMarked,
   Brain,
   Database,
+  Eye,
   Network,
   Palette,
   Plug,
@@ -23,6 +24,7 @@ export type SettingsItemKey =
   | "llm"
   | "embedding"
   | "search"
+  | "multimodal"
   | "memory"
   | "capabilities";
 
@@ -76,6 +78,13 @@ export const SETTINGS_ITEMS: SettingsItem[] = [
     label: "Search",
     description: "Web search providers.",
     icon: Search,
+  },
+  {
+    key: "multimodal",
+    href: "/settings/multimodal",
+    label: "Multimodal",
+    description: "Vision model for video understanding.",
+    icon: Eye,
   },
   {
     key: "capabilities",

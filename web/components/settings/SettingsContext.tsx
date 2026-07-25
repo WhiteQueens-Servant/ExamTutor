@@ -20,7 +20,7 @@ import { setTheme as applyThemePreference } from "@/lib/theme";
 
 // ─── Domain types ─────────────────────────────────────────────────────────
 
-export type ServiceName = "llm" | "embedding" | "search";
+export type ServiceName = "llm" | "embedding" | "search" | "multimodal";
 
 export type CatalogModel = {
   id: string;
@@ -69,6 +69,7 @@ export type Catalog = {
     llm: CatalogService;
     embedding: CatalogService;
     search: CatalogService;
+    multimodal: CatalogService;
   };
 };
 
@@ -211,6 +212,7 @@ export function defaultCatalog(): Catalog {
         profiles: [],
       },
       search: { active_profile_id: null, profiles: [] },
+      multimodal: { active_profile_id: null, active_model_id: null, profiles: [] },
     },
   };
 }
@@ -375,7 +377,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [catalogEditable, setCatalogEditable] = useState<boolean | null>(null);
   const [providers, setProviders] = useState<
     Record<ServiceName, ProviderOption[]>
-  >({ llm: [], embedding: [], search: [] });
+  >({ llm: [], embedding: [], search: [], multimodal: [] });
   const [toast, setToast] = useState("");
   const [saving, setSaving] = useState(false);
   const [applying, setApplying] = useState(false);
