@@ -8,6 +8,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 from typing import Any
 
 from deeptutor.core.tool_protocol import BaseTool, ToolDefinition, ToolParameter, ToolResult
@@ -1128,6 +1129,61 @@ class VideoUnderstandTool(_PromptHintsMixin, BaseTool):
     临时文件管理）由后续任务填充。
     """
 
+    # —— Tool 内部多模态分析 Prompt（融合方案 A+B，4 步，动态帧数在 user 引言填）——
+    _MULTIMODAL_SYSTEM_PROMPT = (
+        "你是一位视频内容分析专家，擅长解读教学/讲解类视频。"
+        "请按以下步骤分析提供给你的视频关键帧与转录文本。\n\n"
+        "## 输出结构（必须遵守）\n"
+        "你的输出必须严格按以下顺序，缺一不可：\n"
+        "1. 先输出 2-4 句自然语言摘要（概述视频主题与讲解脉络）\n"
+        "2. 然后输出 JSON 代码块（结构化数据）\n"
+        "禁止只输出 JSON 而省略摘要。\n\n"
+        "## 数据说明\n"
+        "你将按视频时间顺序，看到关键帧图片，每张图片前有时间标注 ⏱，"
+        "其后紧跟该时刻对应的语音转录 📝。这些图文按视频真实时间流动排列，"
+        "模拟\"边看画面边听讲解\"的学习过程。\n\n"
+        "注意：转录由语音识别生成，存在专业术语的同音错别字"
+        "（如\"时延\"误识为\"实验\"、\"信道\"误识为\"性道\"）。"
+        "关键帧中的板书/字幕文字是准确的专业术语，应作为纠正依据。\n\n"
+        "## 分析步骤\n"
+        "### 第一步：内容理解\n"
+        "按时间顺序\"观看\"所有关键帧，结合对应转录，"
+        "理解视频的主题与讲解结构，识别章节划分。\n"
+        "### 第二步：术语纠正\n"
+        "对比转录文本与关键帧中的板书/字幕文字，"
+        "识别并纠正专业术语的同音错别字。\n"
+        "### 第三步：内容总结\n"
+        "按视频时间顺序，总结每个章节的核心内容，提取关键概念。\n"
+        "### 第四步：输出（必须先摘要后 JSON）\n"
+        "先给一段自然语言摘要（2-4 句，概述视频主题与讲解脉络），再输出 JSON。"
+        "两者缺一不可。\n\n"
+        "## 输出格式（严格遵循）\n"
+        "输出必须形如（<摘要>在前，```json``` 在后）：\n\n"
+        "<2-4 句自然语言摘要>\n\n"
+        "```json\n"
+        "{\n"
+        "  \"video_topic\": \"视频主题\",\n"
+        "  \"duration_sec\": <整数>,\n"
+        "  \"frame_count\": <整数>,\n"
+        "  \"timeline\": [\n"
+        "    {\n"
+        "      \"time_range\": \"HH:MM:SS-HH:MM:SS\",\n"
+        "      \"section_title\": \"章节标题\",\n"
+        "      \"key_points\": [\"要点1\", \"要点2\"],\n"
+        "      \"transcript_excerpt\": \"该章节转录片段（已纠正术语）\"\n"
+        "    }\n"
+        "  ],\n"
+        "  \"term_corrections\": [\n"
+        "    {\"original\": \"错误术语\", \"corrected\": \"正确术语\", \"evidence\": \"来自关键帧板书\"}\n"
+        "  ],\n"
+        "  \"key_concepts\": [\"概念1\", \"概念2\"]\n"
+        "}\n"
+        "```\n\n"
+        "（timeline 按时间顺序；term_corrections 只列真正纠正的术语；"
+        "所有转录在 timeline 里用纠正后的术语。）\n\n"
+        "记住：先摘要，后 JSON，不要省略摘要。"
+    )
+
     def get_definition(self) -> ToolDefinition:
         # schema 的 description 面向 LLM function-calling，保持英文以与
         # 项目其他内置工具一致（zh/en 细化引导放在 hints YAML）。
@@ -1244,29 +1300,57 @@ class VideoUnderstandTool(_PromptHintsMixin, BaseTool):
             except OSError:
                 logger.warning("无法读取转录文件：%s", result.transcript_path)
 
-        content_parts: list[str] = [
+        # —— 任务2 基础 content（多模态分析失败时的降级内容）——
+        extract_parts: list[str] = [
             "[video_understand] 提取完成",
             f"- 时长：{result.duration}秒 | 关键帧：{result.frame_count}张",
             f"- 产物目录：{result.out_dir}",
         ]
         if transcript_text:
-            content_parts.append(
+            extract_parts.append(
                 f"\n--- 转录文本（{len(transcript_text)}字符）---\n{transcript_text}"
             )
         else:
-            content_parts.append("\n（无转录文本——视频可能无音轨，或 whisper 未安装）")
+            extract_parts.append("\n（无转录文本——视频可能无音轨，或 whisper 未安装）")
+        fallback_content = "\n".join(extract_parts)
 
+        # 公共 metadata（无论是否走多模态都带上提取信息）
+        base_metadata: dict[str, Any] = {
+            "video_path": video_path,
+            "out_dir": result.out_dir,
+            "frames_dir": result.frames_dir,
+            "frame_count": result.frame_count,
+            "duration": result.duration,
+            "transcript_path": result.transcript_path,
+            "frames_json_path": result.frames_json_path,
+            "has_transcript": bool(transcript_text),
+        }
+
+        # —— 任务3b-2a：多模态分析（配置缺失/调用失败/模型不支持 vision 时降级）——
+        try:
+            analysis_text = await self._run_multimodal_analysis(
+                result.out_dir, result.frame_count, result.duration
+            )
+        except Exception as exc:
+            logger.warning("video_understand 多模态分析失败，降级到纯转录：%s", exc)
+            return ToolResult(
+                content=fallback_content,
+                metadata={
+                    **base_metadata,
+                    "multimodal_analysis": False,
+                    "multimodal_error": str(exc),
+                },
+            )
+
+        # —— 解析多模态输出（自然语言摘要 + JSON）——
+        natural, json_data = self._parse_multimodal_output(analysis_text)
         return ToolResult(
-            content="\n".join(content_parts),
+            content=analysis_text or fallback_content,
             metadata={
-                "video_path": video_path,
-                "out_dir": result.out_dir,
-                "frames_dir": result.frames_dir,
-                "frame_count": result.frame_count,
-                "duration": result.duration,
-                "transcript_path": result.transcript_path,
-                "frames_json_path": result.frames_json_path,
-                "has_transcript": bool(transcript_text),
+                **base_metadata,
+                "multimodal_analysis": True,
+                "parsed_json": json_data,
+                "natural_summary": natural,
             },
         )
 
@@ -1338,6 +1422,89 @@ class VideoUnderstandTool(_PromptHintsMixin, BaseTool):
                 content_parts.append({"type": "text", "text": f"📝 {matched_text}"})
 
         return content_parts
+
+    async def _run_multimodal_analysis(
+        self, out_dir: str, frame_count: int, duration: int
+    ) -> str:
+        """调用多模态 LLM 分析图文流，返回 LLM 的原始响应文本（自然语言+JSON）。
+
+        组装 messages：system（Tool 内部 Prompt）+ user（动态帧数引言 + 3b-1 图文流
+        + 结尾要求），用 multimodal 配置调用 factory.complete。
+        factory.complete 传 messages 后会忽略 prompt/system_prompt 形参，故 system
+        必须放在 messages 里。失败（配置缺失/调用异常）向上抛，由 execute 降级。
+        """
+        # 延迟 import：multimodal 配置（可选，未配置抛 LLMConfigError）+ factory 入口
+        from deeptutor.services.llm import complete as llm_complete
+        from deeptutor.services.llm.config import get_multimodal_llm_config
+
+        mcfg = get_multimodal_llm_config()  # 未配置多模态模型时抛 LLMConfigError
+
+        content_parts = self._build_multimodal_content(out_dir)
+        if not content_parts:
+            raise RuntimeError("未组装出图文内容（out_dir 可能缺少 frames/ 或 frames.json）")
+
+        # 动态帧数/时长写进 user 引言（共识：帧数 N 动态填入实际值）
+        intro = {
+            "type": "text",
+            "text": (
+                f"本视频共 {frame_count} 张关键帧，时长 {duration} 秒。"
+                "请按系统提示的步骤，分析下面的图文流。"
+            ),
+        }
+        outro = {
+            "type": "text",
+            "text": "以上为本视频按时间顺序的全部关键帧与转录。请输出：自然语言摘要 + JSON。",
+        }
+        user_content: list[dict[str, Any]] = [intro, *content_parts, outro]
+
+        messages = [
+            {"role": "system", "content": self._MULTIMODAL_SYSTEM_PROMPT},
+            {"role": "user", "content": user_content},
+        ]
+
+        # model/api_key/base_url/binding 用 multimodal config 构造独立 call config
+        response = await llm_complete(
+            prompt="",
+            system_prompt="",
+            messages=messages,
+            model=mcfg.model,
+            api_key=mcfg.api_key,
+            base_url=mcfg.base_url,
+            binding=mcfg.binding,
+        )
+        return response or ""
+
+    def _parse_multimodal_output(
+        self, response_text: str
+    ) -> tuple[str, dict[str, Any] | None]:
+        """分离多模态 LLM 返回的自然语言摘要与 JSON。
+
+        优先匹配 ```json ... ``` 代码块；否则尝试最外层 {...}。返回
+        (natural_summary, json_data)；解析不出 JSON 时 json_data 为 None。
+        """
+        text = response_text or ""
+        json_data: dict[str, Any] | None = None
+        match = re.search(r"```json\s*(\{.*?\})\s*```", text, re.DOTALL)
+        if match:
+            try:
+                json_data = json.loads(match.group(1))
+            except Exception:
+                json_data = None
+        if json_data is None:
+            # 退化：找最外层花括号块
+            match2 = re.search(r"\{.*\}", text, re.DOTALL)
+            if match2:
+                try:
+                    json_data = json.loads(match2.group(0))
+                except Exception:
+                    json_data = None
+        # 自然语言 = 去掉 JSON 代码块后的剩余文本
+        natural = text
+        if match is not None:
+            natural = (text[: match.start()] + text[match.end() :]).strip()
+        elif json_data is not None and match2 is not None:
+            natural = (text[: match2.start()] + text[match2.end() :]).strip()
+        return natural, json_data
 
 
 BUILTIN_TOOL_TYPES: tuple[type[BaseTool], ...] = (
