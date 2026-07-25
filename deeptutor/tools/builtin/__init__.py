@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import json
 import logging
@@ -1268,6 +1269,75 @@ class VideoUnderstandTool(_PromptHintsMixin, BaseTool):
                 "has_transcript": bool(transcript_text),
             },
         )
+
+    def _build_multimodal_content(self, out_dir: str) -> list[dict[str, Any]]:
+        """时间对齐 + 组装多模态图文流（共识10：按视频时间顺序交错排列图文）。
+
+        读 out_dir 下的 frames.json（每帧 timestamp_sec）与 transcript.json
+        （每段 start/end），用双指针 O(F+S) 为每帧匹配时间上最近的转录段，
+        再按视频时间顺序交错输出「时间标注 + 帧图(base64) + 对应转录」，
+        让多模态 LLM 看到一条贴近人类"边看画面边听讲解"学习顺序的图文流。
+
+        Args:
+            out_dir: 任务2 产物目录（含 frames/、frames.json、transcript.json）
+
+        Returns:
+            OpenAI 多模态 content parts 数组，元素形如
+            ``{"type": "text", ...}`` / ``{"type": "image_url", ...}``。
+        """
+        # —— 读取帧时间戳（frames.json 已按时间排序）——
+        frames_path = os.path.join(out_dir, "frames.json")
+        frames: list[dict[str, Any]] = []
+        if os.path.exists(frames_path):
+            with open(frames_path, encoding="utf-8") as f:
+                frames = (json.load(f) or {}).get("frames", [])
+
+        # —— 读取转录段（transcript.json 的 segments 带 start/end）——
+        transcript_json_path = os.path.join(out_dir, "transcript.json")
+        segments: list[dict[str, Any]] = []
+        if os.path.exists(transcript_json_path):
+            with open(transcript_json_path, encoding="utf-8") as f:
+                segments = (json.load(f) or {}).get("segments", [])
+
+        content_parts: list[dict[str, Any]] = []
+        # —— 双指针对齐：seg_idx 单调推进，总推进次数 <= len(segments)，整体 O(F+S) ——
+        # 思路：frames 与 segments 都按时间排序；对每帧 t，把 seg_idx 推进到
+        # "start <= t 的最后一段"，该段即时间上最接近 t 的转录段（覆盖或最近前段）。
+        seg_idx = 0
+        for frame in frames:
+            t = float(frame.get("timestamp_sec", 0) or 0)
+            while (
+                seg_idx < len(segments) - 1
+                and float(segments[seg_idx + 1].get("start", float("inf"))) <= t
+            ):
+                seg_idx += 1
+            matched_text = ""
+            if segments:
+                matched_text = str(segments[seg_idx].get("text", "") or "")
+
+            # —— 时间标注 ——
+            ts = str(frame.get("timestamp", "") or "")
+            if ts:
+                content_parts.append({"type": "text", "text": f"⏱ [{ts}]"})
+
+            # —— 帧图 base64（OpenAI image_url 格式）——
+            frame_file = str(frame.get("file", "") or "")
+            frame_path = os.path.join(out_dir, "frames", frame_file)
+            if frame_file and os.path.exists(frame_path):
+                with open(frame_path, "rb") as fp:
+                    img_b64 = base64.b64encode(fp.read()).decode("ascii")
+                content_parts.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"},
+                    }
+                )
+
+            # —— 对应转录 ——
+            if matched_text:
+                content_parts.append({"type": "text", "text": f"📝 {matched_text}"})
+
+        return content_parts
 
 
 BUILTIN_TOOL_TYPES: tuple[type[BaseTool], ...] = (
